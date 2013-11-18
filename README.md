@@ -49,7 +49,7 @@ metadata APIs.
 ## Installation and Administration
 
 MyCharts can be installed from the salesforce.com AppExchange via
-[http://bit.ly/mycharts]() as an unmanaged package.  Managed versions
+[http://bit.ly/mycharts](http://bit.ly/mycharts) as an unmanaged package.  Managed versions
 of the package will be available later.  In either case, the
 installation process is automatic. Before installing the MyCharts
 package, ensure that your instance of Salesforce satisfies the
