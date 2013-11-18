@@ -29,15 +29,28 @@ combination with MyCharts. For example, the built-in charts can be
 embedded in other locations and can also be composed into a larger
 dashboard of charts that can be updated in bulk.
 
-Note: Throughout this document we refer to MyCharts by the single name
-of "MyCharts." However, this package has occasionally been referred to
-as "My Insights." As a result, you might occasionally see "My
-Insights" or "Show Insights" in the interface.
+> Note: Throughout this document we refer to MyCharts by the single
+> name of "MyCharts." However, this package has occasionally been
+> referred to as "My Insights." As a result, you might occasionally
+> see "My Insights" or "Show Insights" in the interface.
+
+## Building from Source
+
+If you intend to work from the source code of MyCharts, you'll need to
+take at least four steps to build and deploy to a salesforce org via the
+metadata APIs.
+
+1. Make sure that you have ant installed.
+2. Install the ant extensions in this repository's deps/ directory.
+3. Fill in an org profile in the build.properties file.
+4. Run "ant -Dprofile=USERNAME" where USERNAME is the profile that you defined in the previous step.
+
 
 ## Installation and Administration
 
-MyCharts will eventually be distributed as a Force.com package, but it
-is available now as an unmanaged package. In either case, most of the
+MyCharts can be installed from the salesforce.com AppExchange via
+[http://bit.ly/mycharts]() as an unmanaged package.  Managed versions
+of the package will be available later.  In either case, the
 installation process is automatic. Before installing the MyCharts
 package, ensure that your instance of Salesforce satisfies the
 following two requirements.
@@ -87,12 +100,12 @@ Actions in the Publisher Layouts Setup section. One side-effect of
 adding a Publisher Action is that it will also add MyCharts as a new
 Chatter post type to the desktop experience.
 
-Note: At this time, MyCharts is not designed to be a Chatter post
-type, but there is there no way to disable the new Chatter post type
-without disabling the corresponding MDP action. As a result, we
-suggest that when you add MyCharts as a Publisher Action, place it in
-any position other than the first action. This will prevent MyCharts
-from being the default Chatter posting experience.
+> Note: At this time, MyCharts is not designed to be a Chatter post
+> type, but there is there no way to disable the new Chatter post type
+> without disabling the corresponding MDP action. As a result, we
+> suggest that when you add MyCharts as a Publisher Action, place it
+> in any position other than the first action. This will prevent
+> MyCharts from being the default Chatter posting experience.
 
 ### Enabling MyCharts Desktop Tab
 
@@ -129,10 +142,11 @@ report that was saved with summary or matrix format. Scatter charts
 have the additional requirement that they have at least two numerical
 values as part of the report output.
 
-Note: MyCharts cannot determine at run time if a report fulfills these
-requirements. As a result, it’s possible to pick a report that is
-unsuitable for making a chart, so we suggest that when giving demos
-you appropriately prune the reports that are in your personal folder.
+> Note: MyCharts cannot determine at run time if a report fulfills
+> these requirements. As a result, it’s possible to pick a report that
+> is unsuitable for making a chart, so we suggest that when giving
+> demos you appropriately prune the reports that are in your personal
+> folder.
 
 ### Editing Charts
 
