@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomTab xmlns="http://soap.sforce.com/2006/04/metadata">
+    <icon>MyCharts/my_charts_icon_stageleft2x.png</icon>
+    <label>My Charts</label>
+    <mobileReady>false</mobileReady>
+    <motif>Custom235: TV Widescreen</motif>
+    <page>MyCharts</page>
+</CustomTab>

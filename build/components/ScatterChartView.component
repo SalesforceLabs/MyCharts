@@ -1,0 +1,166 @@
+<!-- 
+
+Copyright (c) 2013, salesforce.com, Inc. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification, 
+are permitted provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright notice, 
+    this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright notice, 
+    this list of conditions and the following disclaimer in the documentation 
+    and/or other materials provided with the distribution.
+    * Neither the name of the salesforce.com, Inc. nor the names of its contributors 
+    may be used to endorse or promote products derived from this software 
+    without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. 
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, 
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, 
+BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, 
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE 
+OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED 
+OF THE POSSIBILITY OF SUCH DAMAGE.
+
+-->
+
+<apex:component>
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+<script>
+;(function() {
+    var MyCharts = window.MyCharts = window.MyCharts || {};
+
+    MyCharts.ScatterChartView = MyCharts.ChartView.extend({
+
+        initialize: function (params) {
+            this._reportData = params.data;
+            this._type = params.type;
+            this._groupings = [ 0, -1 ];
+            this._aggregates = [ 0, 1, -1 ];
+        },
+
+        /*****************************************************************/
+
+        createConfigView: function() {
+            var self = this;
+
+            var configView = new MyCharts.ChartConfigView({
+                reportData: this._reportData,
+                properties: [ 
+                    {
+                        name: 'Grouping',
+                        values: _.map(this._reportData.groupings, function(grouping) {
+                            return grouping.label;
+                        }),
+                        defaultSelectedIndex: self._groupings[0]
+                    },
+                    {
+                        name: 'Subgrouping',
+                        values: _.map(this._reportData.groupings, function(grouping) {
+                            return grouping.label;
+                        }),
+                        isOptional: true,
+                        defaultSelectedIndex: self._groupings[1]
+                    },
+                    {
+                        name: 'X Axis',
+                        values: _.map(this._reportData.aggregates, function(aggregate) {
+                            return ReportData.prettifyAggregateLabel(aggregate.label);
+                        }),
+                        defaultSelectedIndex: self._aggregates[0]
+                    },
+                    {
+                        name: 'Y Axis',
+                        values: _.map(this._reportData.aggregates, function(aggregate) {
+                            return ReportData.prettifyAggregateLabel(aggregate.label);
+                        }),
+                        defaultSelectedIndex: self._aggregates[1]
+                    },
+                    {
+                        name: 'Size',
+                        values: _.map(this._reportData.aggregates, function(aggregate) {
+                            return ReportData.prettifyAggregateLabel(aggregate.label);
+                        }),
+                        isOptional: true,
+                        defaultSelectedIndex: self._aggregates[2]
+                    }
+                ]
+            });
+
+            configView.on('propertyChanged', function(propertyIdx, valueIdx) {
+                if (propertyIdx <= 1) {
+                    self._groupings[propertyIdx] = valueIdx;
+                }
+                else {
+                    var whichAggregate = propertyIdx - 2;
+                    var newAggregateIdx = valueIdx;
+                    if (newAggregateIdx >= self._reportData.aggregates.length)
+                        newAggregateIdx = -1;
+                    self._aggregates[whichAggregate] = newAggregateIdx;
+                }
+                self._updateChart();
+            });
+
+            return configView;
+        },
+
+        /*****************************************************************/
+
+        supportsData: function() {
+            return this._reportData.aggregates.length >= 2;
+        },
+
+        /*****************************************************************/
+
+        _createChart: function(callback) {
+            if (this._chart)
+                google.visualization.events.removeAllListeners(this._chart);
+
+            this._chart = new google.visualization.BubbleChart(this.$('.chartyPants')[0]);
+            callback && callback();
+        },
+
+        /*****************************************************************/
+
+        _updateChart: function() {
+            var self = this;
+            var aggregates = _.filter(this._aggregates, function(x) {
+                return x >= 0;
+            });
+
+            var chartData;
+            if (this._groupings[1] >= 0 && this._groupings[1] < this._reportData.groupings.length) {
+                chartData = this._reportData.getPairwiseGroupingValues(this._groupings[0],
+                                                                       this._groupings[1],
+                                                                       aggregates,
+                                                                       ReportDataFormatter.pairwiseScatterFormatter);
+            }
+            else {
+                chartData = this._reportData.getSingleGroupingValues(this._groupings[0],
+                                                                     aggregates,
+                                                                     ReportDataFormatter.scatterFormatter);
+            }
+            _.extend(this._options, {
+                hAxis: {title: ReportData.prettifyAggregateLabel(this._reportData.aggregates[aggregates[0]].label)},
+                vAxis: {title: ReportData.prettifyAggregateLabel(this._reportData.aggregates[aggregates[1]].label)},
+                chartArea: { top: '5%', left: '15%', bottom: '15%', right:'10%', 
+                             height: '80%', width: '75%' },
+                /* labels look kind of shitty - rely on tooltips/legend */
+                bubble: { textStyle: { color: 'transparent' } } 
+            });
+
+            this._chart.draw(chartData, this._options);
+        }
+    });
+
+})();
+</script>
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+</apex:component>

@@ -1,0 +1,274 @@
+<!-- 
+
+Copyright (c) 2013, salesforce.com, Inc. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification, 
+are permitted provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright notice, 
+    this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright notice, 
+    this list of conditions and the following disclaimer in the documentation 
+    and/or other materials provided with the distribution.
+    * Neither the name of the salesforce.com, Inc. nor the names of its contributors 
+    may be used to endorse or promote products derived from this software 
+    without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. 
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, 
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, 
+BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, 
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE 
+OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED 
+OF THE POSSIBILITY OF SUCH DAMAGE.
+
+-->
+
+<apex:component>
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+<script type="x-template" id="MiniChartViewTemplate">
+    <a class="miniChartViewBtn share">
+        <i class="shareSprite"></i>
+    </a>
+    <a class="miniChartViewBtn edit">
+        <i class="editSprite"></i>
+    </a>
+    <a class="miniChartViewBtn delete pull-right">
+        <i class="deleteSprite"></i>
+    </a>
+    <h3><%- title %></h3>
+    <img class="chartThumb" src="<%- thumbSrc %>" />
+</script>
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+<style>
+
+.miniChartView {
+    text-align:center;
+    padding: 12px;
+    width: 262px;
+    height: 225px;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    background:#fff;
+    padding: 14px 12px;
+    cursor:pointer;
+    overflow: hidden;
+}
+
+
+.dashboardView.animate .miniChartView {
+    transition-property: top, left, box-shadow;
+    transition-duration: 0.25s, 0.25s, 0.25s;
+    transition-timing-function: ease-in-out, ease-in-out, ease-in-out;
+    transition-delay: 0.25s, 0.25s, 0.125s;
+}
+
+.miniChartView:hover {
+    box-shadow: 0px 0px 10px #8cf;
+}
+
+.miniChartView:active {
+    box-shadow: 0px 0px 10px #888;
+}
+
+.miniChartView .chartyPants {
+    height: 350px;
+    width: 100%;
+}
+
+.miniChartView .miniChartViewBtn {
+    display: inline-block;
+    border: none;
+    margin:2px;
+    float: left;
+}
+
+
+.miniChartView .miniChartViewBtn i {
+    opacity:0;
+    /* causes rendering artifict in chrome. */
+    /* transition: opacity .35s ease-in-out; */
+}
+
+.miniChartView:hover .miniChartViewBtn i {
+    opacity: 1.0;
+}
+
+.miniChartViewBtn.delete {
+    float:right !important;
+}
+
+.miniChartView .miniChartViewBtn i {
+    display: inline-block;
+    background: url({!URLFOR($Resource.MyChartsZip, '/images/actionsSprite.png')}) no-repeat;
+    width: 16px;
+    height: 16px;
+}
+
+.miniChartView h3 {
+    display: block;
+    font-size: 18px;
+    line-height: 22px;
+    color: #666;
+    font-weight: normal;
+    margin-bottom: 15px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+    margin: 0;
+    margin-bottom: 14px;
+    padding:0;
+    padding-right: 14px;
+
+    /* If you change this, make sure charts with long
+     * titles don't break the mobile dashboard view
+     */
+    max-width: 250px;
+    text-align: center;
+}
+
+.miniChartView:hover h3 {
+    opacity: 0.2;
+    /* causes rendering artifict in chrome. */
+    /* transition: opacity 0.35s ease-in-out; */
+}
+
+.miniChartView .share .shareSprite {
+    background-position: -0px -0px;
+}
+
+.miniChartView .share .shareSprite:hover {
+    background-position: -0px -19px;
+}
+
+.miniChartView .edit .editSprite {
+    background-position: -19px -0px;
+}
+
+.miniChartView .edit .editSprite:hover {
+    background-position: -19px -19px;
+}
+
+.miniChartView .delete .deleteSprite {
+    background-position: -38px -0px;
+}
+
+.miniChartView .delete .deleteSprite:hover {
+    background-position: -38px -19px;
+}
+
+/* Mobile styles */
+.mobile .miniChartView {
+    margin-bottom: 14px;
+}
+/* NOTE: There is a bug in webkit, adding a box shadow
+   will cause scrolling in the dashboard on real devices
+   to jump around - that is why we are turning them off here
+*/
+.mobile .miniChartView:hover {
+    box-shadow: none;
+}
+
+.mobile .miniChartView:active {
+    box-shadow: none;
+}
+
+.mobile .miniChartView:hover h3 {
+    opacity: 1;
+    transition: none;
+}
+
+.mobile .miniChartView .chartThumb {
+    max-width: 240px;
+    max-height: 240px;
+    transition: none;
+}
+
+.mobile .miniChartViewBtn,
+.mobile .miniChartView:hover .miniChartViewBtn {
+    visibility: hidden;
+}
+
+</style>
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+<script>
+
+;(function() {
+
+    var app = window.MyCharts = window.MyCharts || {};
+
+    /*********************************************************************/
+
+    app.MiniChartView = Marionette.ItemView.extend({
+        className: 'miniChartView',
+        template: '#MiniChartViewTemplate',
+        events: {
+            'click a.delete': '_delete',
+            'click a.edit': '_edit',
+            'click a.share': '_share',
+            'click': '_open'
+        },
+        modelEvents: {
+            'change:imgData': '_imgDataChanged'
+        },
+
+        initialize: function(params) {
+            this.listenTo(this.model, 'change', this.render);
+            this.listenTo(this.model, 'destroy', this.remove);
+        },
+
+        serializeData: function() {
+            var data = this.model.toJSON();
+            data.thumbSrc = data.imgData ||
+                '{!URLFOR($Resource.MyChartsZip, "/images/_.gif")}';
+            return data;
+        },
+
+        /*********************************************************************/
+        // Event handlers
+
+        _delete: function(e) {
+            this.model.destroy();
+            e && e.stopPropagation();
+            e && e.preventDefault();
+            return false;
+        },
+
+        _edit: function(e) {
+            app.openChartPage(this.model, { editChart: true });
+            e.stopPropagation();
+            e.preventDefault();
+            return false;
+        },
+
+        _open: function(e) {
+            app.openChartPage(this.model);
+        },
+
+        _share: function(e) {
+            app.openShareModal(this.model.id);
+            e.stopPropagation();
+            e.preventDefault();
+            return false;
+        },
+
+        _imgDataChanged: function() {
+            this.$('.chartThumb').attr('src', this.model.get('imgData'));
+        }
+    });
+})();
+
+</script>
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+</apex:component>

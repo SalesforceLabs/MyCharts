@@ -1,0 +1,135 @@
+<!-- 
+
+Copyright (c) 2013, salesforce.com, Inc. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification, 
+are permitted provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright notice, 
+    this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright notice, 
+    this list of conditions and the following disclaimer in the documentation 
+    and/or other materials provided with the distribution.
+    * Neither the name of the salesforce.com, Inc. nor the names of its contributors 
+    may be used to endorse or promote products derived from this software 
+    without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. 
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, 
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, 
+BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, 
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE 
+OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED 
+OF THE POSSIBILITY OF SUCH DAMAGE.
+
+-->
+
+<apex:component >
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+<script>
+;(function() {
+    var MyCharts = window.MyCharts = window.MyCharts || {};
+    
+    MyCharts.TreemapChartView = MyCharts.ChartView.extend({
+        
+        initialize: function (params) {
+            this._reportData = params.data;
+            this._type = params.type;
+            this._groupings = [ 0, 1 ];
+            this._aggregates = [ 0 ];
+        },
+
+        /*****************************************************************/
+        
+        createConfigView: function() {
+            var self = this;
+
+            var configView = new MyCharts.ChartConfigView({
+                reportData: this._reportData,
+                properties: [ {
+                    name: 'Primary Grouping',
+                    values: _.map(this._reportData.groupings, function(grouping) {
+                        return grouping.label;
+                    }),
+                    defaultSelectedIndex: self._groupings[0]
+                }, {
+                    name: 'Secondary Grouping',
+                    values: _.map(this._reportData.groupings, function(grouping) {
+                        return grouping.label;
+                    }),
+                    defaultSelectedIndex: self._groupings[1]
+                }, {
+                    name: 'Value',
+                    values: _.map(this._reportData.aggregates, function(aggregate) {
+                        return ReportData.prettifyAggregateLabel(aggregate.label);
+                    }),
+                    defaultSelectedIndex: self._aggregates[0]
+                } ]
+            });
+
+            configView.on('propertyChanged', function(propertyIdx, valueIdx) {
+                switch(propertyIdx) {
+                case 0: // grouping 1
+                    self._groupings[0] = valueIdx;
+                    break;
+                case 1:
+                    self._groupings[1] = valueIdx;
+                    break;
+                default:
+                    self._aggregates[0] = valueIdx;
+                }
+                self._updateChart();
+            });
+
+            return configView;
+        },
+
+        /*****************************************************************/
+
+        supportsData: function() {
+            return this._reportData.groupings.length > 1 &&
+                this._reportData.aggregates.length > 0;
+        },
+
+        /*****************************************************************/
+
+        _createChart: function(callback) {
+            if (this._chart)
+                google.visualization.events.removeAllListeners(this._chart);
+
+            this._chart = new google.visualization.TreeMap(this.$('.chartyPants')[0]);
+            callback && callback();
+        },
+        
+        /*****************************************************************/
+
+        _updateChart: function() {
+            var chartData = this._reportData
+                .getPairwiseGroupingValues(this._groupings[0],
+                                           this._groupings[1],
+                                           [ this._aggregates[0] ],
+                                           ReportDataFormatter.treemapFormatter);
+            _.extend(this._options, {
+                showScale: true,
+                minColor: '#de4f38',  // red
+                midColor: '#f2c04c', // yellow
+                maxColor: '#96af57', // green
+                //chartArea: { top: 50, left: 50 }
+                chartArea: { top: '5%', left: '15%', bottom: '15%', right:'10%', 
+                             height: '80%', width: '75%' }                    
+            });
+            this._chart.draw(chartData, this._options);
+        }
+    });
+
+})();
+</script>
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+</apex:component>

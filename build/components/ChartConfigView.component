@@ -1,0 +1,204 @@
+<!--
+
+Copyright (c) 2013, salesforce.com, Inc. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright notice,
+    this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright notice,
+    this list of conditions and the following disclaimer in the documentation
+    and/or other materials provided with the distribution.
+    * Neither the name of the salesforce.com, Inc. nor the names of its contributors
+    may be used to endorse or promote products derived from this software
+    without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
+OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
+OF THE POSSIBILITY OF SUCH DAMAGE.
+
+-->
+
+<apex:component >
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+<script type="x-template" id="DropdownTemplate">
+<div class="dropdownWrapper">
+    <div class="btn-group dropup">
+        <a class="btn dropdown-toggle" data-toggle="dropdown">
+            <span class="textWrapper">
+            <span class="propertyLabel"></span>
+            <span class="selectedValue">---</span>
+            </span>
+            <span class="caret"></span>
+        </a>
+        <ul class="dropdown-menu" role="menu" aria-labelledby="dropdownMenu">
+        </ul>
+    </div>
+</div>
+</script>
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+<style>
+    /* Be very careful with everything in this block. */
+
+    .chartConfigView {
+        text-align: left;
+    }
+
+    .chartConfigView .dropdownWrapper {
+        width: 100%;
+        padding: 7px 16px 14px 14px;
+        box-sizing: border-box;
+        -moz-box-sizing: border-box;
+    }
+
+    .borderedChartApp .chartConfigView {
+        text-align: left;
+    }
+
+    .borderedChartApp .chartConfigView .dropdownWrapper {
+        width: 100%;
+        padding: 7px 16px 14px 14px;
+        box-sizing: border-box;
+        -moz-box-sizing: border-box;
+    }
+
+    /* MDP has extra padding around it, so we reduce our padding a bit. */
+
+    .viaMDP .chartConfigView {
+        text-align: left;
+        margin: 10px 0 20px 0;
+    }
+
+    .viaMDP .chartConfigView .dropdownWrapper {
+        width: 100%;
+        padding: 7px 14px;
+        box-sizing: border-box;
+        -moz-box-sizing: border-box;
+    }
+
+    /* end of scary block. */
+
+    .chartConfigView .dropup {
+        width: 100%;
+        box-sizing: border-box;
+        -moz-box-sizing: border-box;
+    }
+
+    .chartConfigView .dropup .btn {
+        width: 100%;
+        text-align: left;
+        height: 30px;
+        padding: 2px 0px;
+    }
+
+    .chartConfigView .propertyLabel, .selectedValue, .caret {
+        position: relative;
+        top: 5px;
+    }
+
+    .chartConfigView .propertyLabel {
+        color: gray;
+        text-align: left;
+        padding: 0px 4px 0px 10px;
+    }
+
+    .chartConfigView .caret {
+        float: right;
+        margin-right: 14px;
+    }
+
+    .chartConfigView .dropdown-menu {
+        width: 100%;
+    }
+
+    .chartConfigView .textWrapper {
+        padding: 0;
+        margin: 0;
+        max-width: 90%;
+        float: left;
+    }
+
+</style>
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+<script>
+
+;(function() {
+    var MyCharts = window.MyCharts = window.MyCharts || {};
+
+    MyCharts.ChartConfigView = Backbone.View.extend({
+        className: 'chartConfigView',
+
+        initialize: function(params) {
+            this._reportData = params.reportData;
+            this._numProperties = params.properties.length;
+            this._properties = params.properties;
+        },
+
+        /*****************************************************************/
+
+        render: function() {
+            var self = this;
+            _.each(self._properties, function(property) {
+                // Create a dropdown control for the property
+                var tmpl = _.template($('#DropdownTemplate').html());
+                var $dropdown = $(tmpl());
+                if (property.name)
+                    $dropdown.find('.propertyLabel').text(property.name);
+
+                // and populate it...
+                var $menu = $dropdown.find('.dropdown-menu');
+                _.each(property.values, function(value, idx) {
+
+                    $menu.append($('<li></li>').append($('<a href="#"></a>').text(value)));
+
+                    if (idx == property.defaultSelectedIndex) {
+                        $dropdown.find('.selectedValue').text(value).val(value);
+                    }
+                });
+                if (property.isOptional) {
+                    $menu.append('<li><a href="#"> --- </a></li>')
+                }
+
+                // Hookup event handlers on list items.
+                $menu.on('click', 'li a', function() {
+                    // Update the dropdown control to display the newly selected item.
+                    $(this).parents('.btn-group').find('.selectedValue')
+                        .text($(this).text())
+                        .val($(this).text());
+
+                    // Which property/value was changed? Include that in the event
+                    var propertyIndex = $(this).parents('.dropdownWrapper').index();
+                    var valueIndex = $(this).parent().index();
+                    self.trigger('propertyChanged', propertyIndex, valueIndex);
+
+                    $(this).parents('.dropup').find('.dropdown-toggle').dropdown('toggle');
+                    return false;
+                });
+
+                // Append the dropdown to the control
+                self.$el.append($dropdown);
+            });
+            return this;
+        }
+    });
+})();
+
+</script>
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+</apex:component>

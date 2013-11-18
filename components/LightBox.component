@@ -1,0 +1,177 @@
+<!-- 
+
+Copyright (c) 2013, salesforce.com, Inc. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification, 
+are permitted provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright notice, 
+    this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright notice, 
+    this list of conditions and the following disclaimer in the documentation 
+    and/or other materials provided with the distribution.
+    * Neither the name of the salesforce.com, Inc. nor the names of its contributors 
+    may be used to endorse or promote products derived from this software 
+    without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. 
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, 
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, 
+BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, 
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE 
+OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED 
+OF THE POSSIBILITY OF SUCH DAMAGE.
+
+-->
+
+<apex:component >
+
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+<style>
+
+#myChartsLightBoxOverlay {
+    width: 150%;
+    height: 100%;
+    z-index: 2147483645;
+    background-color: #000;
+    opacity: 0.8;
+    top: 0px;
+    left: 0px;
+    position: fixed;
+}
+
+#myChartsLightBoxContainer {
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    position: fixed;
+    background-color: transparent;
+    z-index: 2147483645;
+}
+
+#myChartsLightBoxContainer iframe {
+    border-radius: 10px;
+}
+
+.iframeAnimate {
+    transition: all 0.5s ease-in;
+    transition-property: top, opacity;
+    transition-duration: 0.5s, 1s;
+    transition-timing-function: ease-in, ease-in;
+    transition-delay: 0s, 0s;
+}
+
+</style>
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+<script>
+
+;(function() {
+    var app = window.MyCharts = window.MyCharts || {};
+
+    if (app.openLightBox)
+        return;
+
+    /*********************************************************************/
+
+    app.iframeOnLoad = function(embed) {
+        var $iframe = $(this);
+        $iframe.css('visibility', 'visible');
+        if (!embed) {
+            $iframe.addClass('iframeAnimate');
+            $iframe.animate({ top: '0px' }, 300);
+        }
+    }
+
+    /*********************************************************************/
+
+    app.openLightBox = function(chartId, url, embed, callback) {
+        if (app.isMobile()) {
+            throw 'Called openLightbox from mobile!';
+            return;
+        }
+
+        var iframe = $('<iframe class="' +
+                       (true ? '' : 'iframeAnimate') +  '"' +
+                       '/>')
+            .css({ width: '100%',
+                   height: embed ? '900px' : '100%',
+                   position: embed ? 'static' : 'absolute',
+                   top: embed ? 0 : -2000,
+                   visibility: 'hidden'
+                 })
+            .attr({
+                frameborder: 0,
+                width: '100%',
+                height: embed ? '900px' : '100%',
+                scrolling: 'no',
+                src: url + (embed ? '&embed=true' : ''),
+                onload: 'window.MyCharts.iframeOnLoad.call' +
+                    '(this,' + embed + ');'
+            });
+
+        var overlay, container;
+
+        if (embed) {
+            container = $('<div id="myChartsEmbedContainer"/>')
+                .appendTo('#dashboard');
+        }
+        else {
+            overlay = $('<div id="myChartsLightBoxOverlay"/>')
+                .appendTo('body');
+            container = $('<div id="myChartsLightBoxContainer"/>')
+                .appendTo('body');
+        }
+
+        container.append(iframe);
+
+        /*****************************************************************/
+
+        function onViewerMessage(e) {
+            // This ugliness makes sure we only respond to messages coming
+            // from the iframe created in this closure. Prevents double
+            // calling when there are two lightboxes on the screen.
+
+            if (iframe.contents()[0] != $(e.originalEvent.source.document)[0])
+                return;
+            if (!e || !e.originalEvent || !e.originalEvent.data)
+                return;
+            callback && callback(e.originalEvent.data, closeLightbox);
+        }
+
+        /*****************************************************************/
+
+        function closeLightbox() {
+            $(window).unbind('message', onViewerMessage);
+            container.fadeOut(150, function() { container.remove(); });
+            if (!embed) {
+                overlay.fadeOut(150, function() { overlay.remove() });
+                $('body').css('overflow', 'auto');
+            }
+        }
+
+        /*****************************************************************/
+
+        $(window).bind('message', onViewerMessage);
+        if (!embed) {
+            $('body').css('overflow', 'hidden');
+        }
+
+
+    };
+
+    /*********************************************************************/
+
+}());
+</script>
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+</apex:component>

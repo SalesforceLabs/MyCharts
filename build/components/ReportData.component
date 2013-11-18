@@ -1,0 +1,409 @@
+<!-- 
+
+Copyright (c) 2013, salesforce.com, Inc. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification, 
+are permitted provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright notice, 
+    this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright notice, 
+    this list of conditions and the following disclaimer in the documentation 
+    and/or other materials provided with the distribution.
+    * Neither the name of the salesforce.com, Inc. nor the names of its contributors 
+    may be used to endorse or promote products derived from this software 
+    without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. 
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, 
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, 
+BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, 
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE 
+OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED 
+OF THE POSSIBILITY OF SUCH DAMAGE.
+
+-->
+
+<apex:component >
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+<script>
+    var MyCharts = window.MyCharts = window.MyCharts || {};
+    var ReportData = MyCharts.ReportData = function(data) {
+        var self = this;
+        this._data = data;
+        this.aggregates = [ ];
+        this.indexForAggregate = { };
+        this.groupings = [ ];
+        this.betterFactMap = { };
+        this.groupingStats = [ ];
+        this.pairwiseGroupingStats = [ ];
+        // If we detect a problem with the data (e.g. no data rows), set this
+        // flag to true so we can show an error message
+        this.isBad = false;
+
+        /*********************************************************************/
+
+        // Flatten the aggregates into a friendlier format.
+        this._extractAggregates = function() {
+            var aggregates = this._data.reportMetadata.aggregates;
+            for(i = 0; i < aggregates.length; ++i) {
+                this.indexForAggregate[aggregates[i]] = i;
+                this.aggregates.push({
+                    label: aggregates[i],
+                    key: i
+                });
+            }
+        };
+
+        /*********************************************************************/
+
+        // Flatten groupingsDown and groupingsAcross into a single array of groupings
+        this._extractGroupings = function() {
+            var self = this;
+            doExtract(this._data.reportMetadata.groupingsDown, true);
+            doExtract(this._data.reportMetadata.groupingsAcross, false);
+            function doExtract(groupingsArray, isDown) {
+                if (!groupingsArray)
+                    return;
+                for(var i = 0; i < groupingsArray.length; ++i) {
+                    // Use the extended metadata to get the pretty name for the grouping
+                    var uglyName = groupingsArray[i].name;
+                    var prettyName = uglyName;
+                    var extMetadata = self._data.reportExtendedMetadata;
+                    if (extMetadata && extMetadata.groupingColumnInfo[uglyName])
+                        prettyName = extMetadata.groupingColumnInfo[uglyName].label;
+
+                    self.groupings.push({
+                        label: prettyName,
+                        buckets: [ ],
+                        indexForBucket: { }
+                    });
+                }
+            }
+        };
+
+        /*********************************************************************/
+
+        // Traverse the groupingsDown and groupingsAcross to determine all the buckets
+        // that exist for each grouping. Store this list in the grouping objects and include
+        // a reverse lookup so we can go from index -> bucket or bucket -> index
+        this._extractBuckets = function() {
+            var self = this;
+            if (this._data.groupingsDown && this._data.groupingsDown.groupings)
+                getBuckets(this._data.groupingsDown.groupings, 0, true);
+            if (this._data.groupingsAcross && this._data.groupingsAcross.groupings)
+                getBuckets(this._data.groupingsAcross.groupings, 0, false);
+
+            function getBuckets(groupingArray, curDepth, isDown) {
+                var groupingIdx = curDepth + (!isDown ? self._data.reportMetadata.groupingsDown.length : 0);
+                var grouping = self.groupings[groupingIdx];
+                for (var i = 0; i < groupingArray.length; ++i) {
+                    var bucketName = groupingArray[i].label;
+                    var idx = grouping.indexForBucket[bucketName];
+                    if (idx == null) {
+                        grouping.indexForBucket[bucketName] = grouping.buckets.length;
+                        grouping.buckets.push(bucketName);
+                    }
+                    if (groupingArray[i].groupings && groupingArray[i].groupings.length > 0) {
+                        getBuckets(groupingArray[i].groupings, curDepth + 1, isDown);
+                    }
+                }
+            }
+        };
+
+        /*********************************************************************/
+
+        this._buildBetterFactMap = function() {
+            var self = this;
+            this._betterFactMap = { };
+            var leftQ = [ ];
+            var rightQ = [ ];
+
+            // To build a better fact map, we ignore the totals. Totals only exist along certain
+            // dimensions, so in the worst case (nested subgrouping) we have to add up all cells
+            // anyway. Thus, just treat every case the same. If, in the future, we see performance issues,
+            // we can explore other ideas.
+
+            // Throw all the deepest level nodes into a queue. One for the down groupings and one
+            // for the across. By combining the coordinates of both, we can construct a complete
+            // address in the fact map for each cell in the chart.
+            if (this._data.groupingsDown && this._data.groupingsDown.groupings)
+                getDeepestNodes(this._data.groupingsDown.groupings, 0, true, leftQ, "");
+            if (this._data.groupingsAcross && this._data.groupingsAcross.groupings)
+                getDeepestNodes(this._data.groupingsAcross.groupings, 0, false, rightQ, "");
+
+            // Combine the two queues to build the new fact map.
+            if (leftQ.length && rightQ.length) {
+                // Case 1: There are both down and across groupings
+                for (var i = 0; i < leftQ.length; ++i) {
+                    for (var j = 0; j < rightQ.length; ++j) {
+                        var oldKey = leftQ[i].fmKey + '!' + rightQ[j].fmKey;
+                        var newKey = leftQ[i].key + '_' + rightQ[j].key;
+                        transferFactMapCell(oldKey, newKey);
+                    }
+                }
+            }
+            else if (leftQ.length) {
+                // Case 2: There are only down groupings
+                for (var i = 0; i < leftQ.length; ++i) {
+                    var oldKey = leftQ[i].fmKey + '!T';
+                    var newKey = leftQ[i].key;
+                    transferFactMapCell(oldKey, newKey);
+                }
+            }
+            else if (rightQ.length) {
+                // Case 3: There are only across groupings
+                for (var i = 0; i < rightQ.length; ++i) {
+                    var oldKey = 'T!' + rightQ[i].fmKey;
+                    var newKey = rightQ[i].key;
+                    transferFactMapCell(oldKey, newKey);
+                }
+            }
+
+            function transferFactMapCell(oldFmKey, newFmKey) {
+                var fmVal = self._data.factMap[oldFmKey];
+                var vals = [ ];
+                for (var k = 0; k < fmVal.aggregates.length; ++k) {
+                    var aggIndex = k;
+                    vals[aggIndex] = fmVal.aggregates[k].value;
+                }
+                self._betterFactMap[newFmKey] = vals;
+            }
+
+            function getDeepestNodes(groupingArray, depth, isDown, Q, curKey) {
+                var groupingIdx = depth + (!isDown ? self._data.reportMetadata.groupingsDown.length : 0);
+                var grouping = self.groupings[groupingIdx];
+                for (var i = 0; i < groupingArray.length; ++i) {
+                    var bucketIdx = grouping.indexForBucket[groupingArray[i].label];
+                    var newKey = curKey + (curKey.length ? '_' : '') + bucketIdx;
+                    if (groupingArray[i].groupings && groupingArray[i].groupings.length > 0) {
+                        getDeepestNodes(groupingArray[i].groupings, depth + 1, isDown, Q, newKey);
+                    }
+                    else {
+                        Q.push({ key: newKey, fmKey: groupingArray[i].key });
+                    }
+                }
+            }
+
+            // no data = bad data. google charts will throw up.
+            if (_.keys(this._betterFactMap).length == 0)
+                this.isBad = true;
+        };
+
+        /*********************************************************************/
+
+        // Helper function used when computing aggregate values. The math needed to compute an average
+        // vs. a total, min or max is different. This function abstracts that away.
+        this._doIncrement = function(value, factMapKey, aggregateIdx) {
+            var aggName = this.aggregates[aggregateIdx].label;
+            var rowCount = this._betterFactMap[factMapKey][this.indexForAggregate['RowCount']];
+
+            // If the current value is null, we initialize it differently depending
+            // on the aggregate statistic being computed
+            if (value == null) {
+                if (/^m!/.test(aggName) || /^mx!/.test(aggName))
+                    value = -1;
+                else {
+                    value = 0;
+                }
+            }
+
+            if (aggName == 'RowCount' || /s!/.test(aggName)) {
+                // for row count or sum, just add
+                value += this._betterFactMap[factMapKey][aggregateIdx];
+            }
+            else if (/^a!/.test(aggName)) {
+                // For average, we need to multiply by the row count to ensure proper weighting.
+                // Later, we'll divide by the row count.
+                value += this._betterFactMap[factMapKey][aggregateIdx] * rowCount;
+            }
+            else if (/^m!/.test(aggName)) {
+                // For min (or max), we only consider this entry if the row count is nonzero.
+                // If so, and this is the first such entry, it becomes the new min or max
+                // automatically. Otherwise test it against the current min/max
+                if (rowCount > 0) {
+                    if (value == -1)
+                        value = this._betterFactMap[factMapKey][aggregateIdx];
+                    else
+                        value = Math.min(value, this._betterFactMap[factMapKey][aggregateIdx]);
+                }
+            }
+            else if (/^mx!/.test(aggName)) {
+                if (rowCount > 0) {
+                    if (value == -1)
+                        value = this._betterFactMap[factMapKey][aggregateIdx];
+                    else
+                        value = Math.max(value, this._betterFactMap[factMapKey][aggregateIdx]);
+                }
+            }
+
+            return value;
+        };
+
+        /*********************************************************************/
+
+        this.getSingleGroupingValues = function(groupingIdx, aggregates, formatter) {
+            var self = this;
+            aggregates.splice(0, 0, this.indexForAggregate['RowCount']);
+            var ret = [ ];
+            var grouping = this.groupings[groupingIdx];
+            for (key in this._betterFactMap) {
+                var bucketIdx = parseInt(key.split('_')[groupingIdx]);
+                if (!ret[bucketIdx]) {
+                    ret[bucketIdx] = [ ];
+                }
+                for (var i = 0; i < aggregates.length; ++i) {
+                    ret[bucketIdx][i] = this._doIncrement(ret[bucketIdx][i], key, aggregates[i]);
+                }
+            }
+
+
+            // Divide averages by row count and remove the extra row count aggregate that was added
+            for (var i = 0; i < ret.length; ++i) {
+                var arr = [ ];
+                for (var j = 0; j < aggregates.length; ++j) {
+                    var rowCount = ret[i][0];
+                    if (/a!/.test(this.aggregates[aggregates[j]].label)) {
+                        if (rowCount > 0)
+                            ret[i][j] /= rowCount;
+                    }
+                }
+                // take out the row count we stuck on the front of the array
+                ret[i].splice(0, 1);
+            }
+            aggregates.splice(0, 1);
+
+            if (formatter) {
+                var aggs = _.map(aggregates, function(aggIdx) { return self.aggregates[aggIdx]; });
+                return formatter(grouping, aggs, ret);
+            }
+            else {
+                return ret;
+            }
+        }
+
+        /*********************************************************************/
+
+        this.getPairwiseGroupingValues = function(grouping1Idx, grouping2Idx, aggregates, formatter) {
+            var start = new Date();
+            var self = this;
+            aggregates.splice(0, 0, this.indexForAggregate['RowCount']);
+            var ret = [ ];
+            var grouping1 = this.groupings[grouping1Idx];
+            var grouping2 = this.groupings[grouping2Idx];
+            for (key in this._betterFactMap) {
+                var keyArr = key.split('_');
+                var bucket1Idx = parseInt(keyArr[grouping1Idx]);
+                var bucket2Idx = parseInt(keyArr[grouping2Idx]);
+
+                // Initialize arrays that have not been created yet
+                if (!ret[bucket1Idx])
+                    ret[bucket1Idx] = [ ];
+                if (!ret[bucket1Idx][bucket2Idx])
+                    ret[bucket1Idx][bucket2Idx] = [ ];
+
+                // Loop over each aggregate and increment values
+                for (var i = 0; i < aggregates.length; ++i) {
+                    ret[bucket1Idx][bucket2Idx][i] = this._doIncrement(ret[bucket1Idx][bucket2Idx][i],
+                                                                       key,
+                                                                       aggregates[i]);
+                }
+            }
+
+            // Divide averages by row count and remove the extra row count aggregate that was added
+            for (var i = 0; i < ret.length; ++i) {
+                for (var j = 0; j < ret[i].length; ++j) {
+                    if (!ret[i][j])
+                        continue;
+                    var rowCount = ret[i][j][0];
+                    for (var k = 0; k < ret[i][j].length; ++k) {
+                        if (/a!/.test(this.aggregates[aggregates[k]].label)) {
+                            if (rowCount > 0)
+                                ret[i][j][k] /= rowCount;
+                        }
+                    }
+                    // Pull off the row count we stuck on the beginning
+                    ret[i][j].splice(0, 1);
+                }
+            }
+            aggregates.splice(0, 1);
+
+            // Fill in any holes with zeros - NVD3 don't like holes.
+            var zero = [ ];
+            for (var i = 0; i < aggregates.length; ++i)
+                zero.push(0);
+            for (var i = 0; i < grouping1.buckets.length; ++i)
+                for (var j = 0; j < grouping2.buckets.length; ++j)
+                    if (ret[i][j] == null)
+                        ret[i][j] = zero;
+
+            var end = new Date();
+
+            if (formatter) {
+                var aggs = _.map(aggregates, function(aggIdx) { return self.aggregates[aggIdx]; });
+                return formatter(grouping1, grouping2, aggs, ret);
+            }
+            else {
+                return ret;
+            }
+        };
+
+        /*********************************************************************/
+
+        // Initialization
+        this._extractGroupings();
+        this._extractAggregates();
+        this._extractBuckets();
+        this._buildBetterFactMap();
+    };
+
+    /*********************************************************************/
+
+    ReportData.prettifyAggregateLabel = function(input) {
+        var parts = input.split('!'), prettyString;
+        switch(parts[0]) {
+            case 's':
+                prettyString = 'Sum of ';
+                break;
+            case 'a':
+                prettyString = 'Average of ';
+                break;
+            case 'mx':
+                prettyString = 'Largest ';
+                break;
+            case 'm':
+                prettyString = 'Smallest ';
+                break;
+            case 'RowCount':
+                return 'Record Count';
+            default:
+                return input;
+        }
+
+        prettyString += ReportData._formatInternalName(parts[1]);
+        return prettyString;
+    };
+
+    ReportData._capitalizeFirstLetter = function(input) {
+        return input.charAt(0).toUpperCase() + input.slice(1);
+    };
+
+    ReportData._formatInternalName = function(input) {
+        var words = input.split('_'), output = '';
+        for(var i = 0; i < words.length; ++i) {
+            output += ReportData._capitalizeFirstLetter(words[i].toLowerCase());
+            if (i !== words.length -1 ) { output += ' '; }
+        }
+        return output;
+    };
+
+</script>
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+</apex:component>

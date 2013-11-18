@@ -1,0 +1,305 @@
+<!-- 
+
+Copyright (c) 2013, salesforce.com, Inc. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification, 
+are permitted provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright notice, 
+    this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright notice, 
+    this list of conditions and the following disclaimer in the documentation 
+    and/or other materials provided with the distribution.
+    * Neither the name of the salesforce.com, Inc. nor the names of its contributors 
+    may be used to endorse or promote products derived from this software 
+    without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. 
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, 
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, 
+BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, 
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE 
+OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED 
+OF THE POSSIBILITY OF SUCH DAMAGE.
+
+-->
+
+<apex:component >
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+<script type="x-template" id="ChartTypePickerViewTemplate">
+    <div class="chartTypes btn-toolbar">
+        <!-- // NOTE: Firefox doesn't seem to like <i> elements and
+             // doesn't register clicks on them, so use buttons instead -->
+        <div class="btn-group">
+            <button data-chart-type="barVertical" class="btn">
+                <i class="vBarChartSprite"></i>
+            </button>
+            <button data-chart-type="barHorizontal" class="btn">
+                <i class="hBarChartSprite"></i>
+            </button>
+            <button data-chart-type="pie" class="btn">
+                <i class="pieChartSprite"></i>
+            </button>
+            <button data-chart-type="line" class="btn">
+                <i class="lineChartSprite"></i>
+            </button>
+            <button data-chart-type="area" class="btn">
+                <i class="areaChartSprite"></i>
+            </button>
+            <button data-chart-type="steppedArea" class="btn">
+                <i class="stepChartSprite"></i>
+            </button>
+            <button data-chart-type="scatter" class="btn">
+                <i class="bubbleChartSprite"></i>
+            </button>
+            <button data-chart-type="treemap" class="btn">
+                <i class="treeChartSprite"></i>
+            </button>
+        </div>
+    </div>
+</script>
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+<style>
+
+    .chartTypePickerView .btn-toolbar .btn-group {
+        padding: 0px;
+        border-radius: 0px;
+        margin-top: 10px;
+        width: 100%;
+    }
+
+    .chartTypePickerView.mobile .btn-group {
+        width: 280px;
+        white-space: normal;
+        margin: 0 auto;
+    }
+
+    .chartTypePickerView.mobile .btn-group .btn {
+        margin-bottom: 12px;
+    }
+
+    .chartTypePickerView .btn-toolbar .btn-group .btn {
+        -webkit-border-radius: 0px;
+        -moz-border-radius: 0px;
+        -webkit-border-radius: 0px;
+        -moz-border-radius: 0px;
+        padding: 0px;
+        border-radius: 0px;
+        -webkit-border-radius: 0px;
+        -moz-border-radius: 0px;
+        border: none;
+        background-color: transparent;
+        background-image: none;
+        -webkit-box-shadow: none;
+        -moz-box-shadow: none;
+        box-shadow: none;
+        margin-left: 18px;
+        margin-right: 18px;
+    }
+
+    .chartTypePickerView .btn-group .btn:focus,
+    .chartTypePickerView .btn-group .btn i:focus {
+        outline: none;
+    }
+
+    .chartTypePickerView .vBarChartSprite,
+    .chartTypePickerView .hBarChartSprite,
+    .chartTypePickerView .lineChartSprite,
+    .chartTypePickerView .areaChartSprite,
+    .chartTypePickerView .stepChartSprite,
+    .chartTypePickerView .pieChartSprite,
+    .chartTypePickerView .bubbleChartSprite,
+    .chartTypePickerView .treeChartSprite {
+        background: url({!URLFOR($Resource.MyChartsZip, '/images/chartSprite@2x.png')}) no-repeat;
+        width:34px;
+        height:34px;
+        display: inline-block;
+        background-size: 272px;
+    }
+
+    .chartTypePickerView .chartTypes {
+        margin-bottom: 0;
+        margin-top: 14px;
+    }
+
+    .chartTypePickerView .vBarChartSprite {
+        background-position: -1px 1px;
+    }
+
+    .chartTypePickerView .hBarChartSprite {
+        background-position: -33px 1px;
+    }
+
+    .chartTypePickerView .pieChartSprite {
+        background-position: -68px 1px;
+    }
+
+    .chartTypePickerView .lineChartSprite {
+        background-position: -102px 1px;
+    }
+
+    .chartTypePickerView .areaChartSprite {
+        background-position: -137px 1px;
+    }
+
+    .chartTypePickerView .stepChartSprite {
+        background-position: -171px 1px;
+    }
+
+    .chartTypePickerView .bubbleChartSprite {
+        background-position: -205px 1px;
+    }
+
+    .chartTypePickerView .treeChartSprite {
+        background-position: -239px 1px;
+    }
+
+    .chartTypePickerView .vBarChartSprite.active,
+    .chartTypePickerView .vBarChartSprite:hover {
+        background-position: -1px -33px;
+    }
+
+    .chartTypePickerView .hBarChartSprite.active,
+    .chartTypePickerView .hBarChartSprite:hover {
+        background-position: -33px -33px;
+    }
+
+    .chartTypePickerView .pieChartSprite.active,
+    .chartTypePickerView .pieChartSprite:hover {
+        background-position: -68px -33px;
+    }
+
+    .chartTypePickerView .lineChartSprite.active,
+    .chartTypePickerView .lineChartSprite:hover {
+        background-position: -102px -33px;
+    }
+
+    .chartTypePickerView .areaChartSprite.active,
+    .chartTypePickerView .areaChartSprite:hover {
+        background-position: -137px -33px;
+    }
+
+    .chartTypePickerView .stepChartSprite.active,
+    .chartTypePickerView .stepChartSprite:hover {
+        background-position: -171px -33px;
+    }
+
+    .chartTypePickerView .bubbleChartSprite.active,
+    .chartTypePickerView .bubbleChartSprite:hover {
+        background-position: -205px -33px;
+    }
+
+    .chartTypePickerView .treeChartSprite.active,
+    .chartTypePickerView .treeChartSprite:hover {
+        background-position: -239px -33px;
+    }
+
+</style>
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+<script>
+;(function() {
+    var MyCharts = window.MyCharts = window.MyCharts || {};
+
+    MyCharts.ChartTypePickerView = Marionette.ItemView.extend({
+        className: 'chartTypePickerView',
+        template: '#ChartTypePickerViewTemplate',
+        events: {
+            'click button': '_onSelection'
+        },
+
+        initialize: function (params) {
+            this._defaultChartType = params.chartType ||
+                MyCharts.ChartTypes.barVertical;
+            if (params.mobile) {
+                // Stops chart buttons flashing when you tap them
+                this.$el.css('-webkit-tap-highlight-color','transparent');
+                this.$el.addClass('mobile');
+            }
+        },
+
+        onRender: function() {
+            this.$('button[data-chart-type="' +
+                   this._defaultChartType + '"] i')
+                .addClass('active');
+        },
+
+        _onSelection: function(e) {
+            var $btn = $(e.currentTarget);
+            $btn.parent().find('i').removeClass('active');
+            $btn.find('i').addClass('active');
+            this.trigger('chartTypeChanged', $btn.data('chart-type'));
+            return false;
+        }
+    });
+
+    /*********************************************************************/
+
+    // All the individual chart styles
+    MyCharts.ChartTypes = {
+        barVertical: 'barVertical',
+        barHorizontal: 'barHorizontal',
+        line: 'line',
+        area: 'area',
+        steppedArea: 'steppedArea',
+        pie: 'pie',
+        donut: 'donut',
+        scatter: 'scatter',
+        treemap: 'treemap'
+    };
+
+    // The higher-level chart families, each of which contains one
+    // or more chart styles.  A vertical bar chart, horizontal bar
+    // chart and line chart are all in the same family because
+    // they operate on the same data. If we switch between two
+    // charts of the same family, we can therefore keep the state
+    // the same.
+    MyCharts.ChartFamilies = {
+        bar: 'bar',
+        pie: 'pie',
+        scatter: 'scatter',
+        treemap: 'treemap'
+    };
+
+    // Mapping from chart style to its family
+    MyCharts.ChartFamiliesByType = { }
+    MyCharts.ChartFamiliesByType[MyCharts.ChartTypes.barVertical] =
+        MyCharts.ChartFamilies.bar;
+    MyCharts.ChartFamiliesByType[MyCharts.ChartTypes.barHorizontal] =
+        MyCharts.ChartFamilies.bar;
+    MyCharts.ChartFamiliesByType[MyCharts.ChartTypes.line] =
+        MyCharts.ChartFamilies.bar;
+    MyCharts.ChartFamiliesByType[MyCharts.ChartTypes.area] =
+        MyCharts.ChartFamilies.bar;
+    MyCharts.ChartFamiliesByType[MyCharts.ChartTypes.steppedArea] =
+        MyCharts.ChartFamilies.bar;
+    MyCharts.ChartFamiliesByType[MyCharts.ChartTypes.pie] =
+        MyCharts.ChartFamilies.pie;
+    MyCharts.ChartFamiliesByType[MyCharts.ChartTypes.donut] =
+        MyCharts.ChartFamilies.pie;
+    MyCharts.ChartFamiliesByType[MyCharts.ChartTypes.scatter] =
+        MyCharts.ChartFamilies.scatter;
+    MyCharts.ChartFamiliesByType[MyCharts.ChartTypes.treemap] =
+        MyCharts.ChartFamilies.treemap;
+
+    MyCharts.ChartViewMap = {
+        bar     : "BarChartView",
+        pie     : "PieChartView",
+        scatter : "ScatterChartView",
+        treemap : "TreemapChartView"
+    };
+
+})();
+</script>
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+</apex:component>

@@ -1,0 +1,231 @@
+<!-- 
+
+Copyright (c) 2013, salesforce.com, Inc. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification, 
+are permitted provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright notice, 
+    this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright notice, 
+    this list of conditions and the following disclaimer in the documentation 
+    and/or other materials provided with the distribution.
+    * Neither the name of the salesforce.com, Inc. nor the names of its contributors 
+    may be used to endorse or promote products derived from this software 
+    without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. 
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, 
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, 
+BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, 
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE 
+OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED 
+OF THE POSSIBILITY OF SUCH DAMAGE.
+
+-->
+
+<apex:component >
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+<script type="x-template" id="ReportPickerViewTemplate">
+    <h1>Pick A Report</h1>
+    <ul></ul>
+    <img class="reportLoadingIcon"
+     src="{!URLFOR($Resource.MyChartsZip, '/images/loading-white.gif')}" />
+</script>
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+<style>
+
+.reportPickerView {
+    overflow-x: hidden;
+    overflow-y: scroll;
+    min-height: 300px;
+    text-align: center;
+}
+.desktop .reportPickerView {
+    max-height: 600px;
+}
+
+.reportPickerView h1 {
+    background: -webkit-linear-gradient(bottom, #33495f 0%, #23394d 100%);
+    background: -moz-linear-gradient(bottom, #33495f 0%, #23394d 100%);
+    background: -ms-linear-gradient(bottom, #33495f 0%, #23394d 100%);
+    background: linear-gradient(bottom, #33495f 0%, #23394d 100%);
+    filter: progid:DXImageTransform.Microsoft.gradient(GradientType=0,startColorstr='#33495f', endColorstr='#23394d');/*For IE7-8-9*/
+    margin: 0px;
+    text-align: left;
+    font-size: 32px;
+    font-weight: normal;
+    color: #fff;
+    padding: 14px;
+}
+
+.reportPickerView ul {
+    border: none;
+    margin:0;
+    overflow: visible;
+    background-color: #f0f1f2;
+    text-align: left;
+}
+
+.reportPickerView li {
+    list-style-type: none;
+    line-height: 56px;
+    font-size:20px;
+    padding-left:14px;
+    border: none;
+    border-bottom: 1px solid #bbc0c4;
+    cursor: pointer;
+    color: #3c3d3e;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    display: block;
+    width: auto;
+}
+
+.reportPickerView .reportLoadingIcon {
+    position: relative;
+    top: 80px;
+}
+
+.reportPickerView .reportPickerError {
+    position: relative;
+    top: 100px;
+    font-size: 20px;
+}
+
+@media (max-device-width: 568px) {
+
+    .reportPickerView h1 {
+        font-size: 18pt;
+        font-weight: lighter;
+    }
+
+    /* Stupid stupid hack for iOS. Without this, despite any sort of
+       text-overflow rules, these divs end up becoming wider than the screen
+       and making all the parents up the chain too wide as well. */
+    .reportPickerView li {
+        max-width: 300px;
+    }
+
+}
+
+</style>
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+<script>
+;(function() {
+    var MyCharts = window.MyCharts = window.MyCharts || {};
+
+    MyCharts.ReportPickerView = Marionette.ItemView.extend({
+        className: 'reportPickerView',
+        template: '#ReportPickerViewTemplate',
+        events: {
+            'click ul li': '_click',
+            'mousedown ul li': '_mousedown',
+            'mousemove ul li': '_mousemove',
+            'mouseup ul li': '_mouseup'
+        },
+
+        /*****************************************************************/
+
+        initialize: function(params) {
+            this._params = params;
+            this._didScroll = false;
+            this._mouseIsDown = false;
+            this._reports = [ ];
+            if (MyCharts.isMobile())
+                this.$el.addClass('mobile');
+        },
+
+        /*****************************************************************/
+
+        onRender: function() {
+            var self = this;
+
+            // Query for all reports in the system. Store the results and update the
+            // report dropdown.
+            var client = this._params.clientFactory();
+            var queryString = "SELECT Id,Name FROM Report " +
+                "WHERE Format != 'Tabular' AND (Not Name Like '%Sample Report:%') " +
+                "AND (Not Name Like '%Sample Reports:%') "
+            "ORDER BY LastRunDate DESC NULLS LAST";
+
+            // Changing this for org62
+
+            queryString = "SELECT Id,Name FROM Report " +
+                "WHERE Format != 'Tabular' AND CreatedById = '{!$User.ID}' "
+            "ORDER BY LastRunDate DESC NULLS LAST";
+
+            client.query(queryString,
+                         function(response) {
+                             self.$('.reportLoadingIcon').hide();
+                             if (response && response.records &&
+                                 response.records.length > 0) {
+                                 _.each(response.records, function(x) {
+                                     self._reports.push(x);
+                                 });
+                                 var $ul = self.$('ul');
+                                 for (var i = 0; i < self._reports.length; ++i) {
+                                     $ul.append(
+                                         $('<li>').text(self._reports[i].Name));
+                                 }
+                             }
+                             else {
+                                 noReports();
+                             }
+                         },
+                         function(jqXHR, textStatus, errorThrown) {
+                             self.$el.append($('<div>Error loading reports</div>')
+                                             .addClass('reportPickerError'));
+                         }
+                        );
+
+            function noReports() {
+                self.$el.append($('<div>No reports available</div>')
+                                .addClass('reportPickerError'));
+            }
+        },
+
+        /*****************************************************************/
+        // Event handlers
+
+        _click: function() {
+            return false;
+        },
+
+        _mousedown: function() {
+            this._didScroll = false;
+            this._mouseIsDown = true;
+            return false;
+        },
+
+        _mousemove: function() {
+            if (this._mouseIsDown)
+                this._didScroll = true;
+            return false;
+        },
+
+        _mouseup: function(e) {
+            this._mouseIsDown = false;
+            if (!this._didScroll)
+                this.trigger('reportSelected',
+                             this._reports[$(e.currentTarget).index()].Id);
+            return false;
+        }
+
+    });
+})();
+</script>
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+</apex:component>

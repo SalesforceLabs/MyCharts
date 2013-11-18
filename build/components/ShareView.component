@@ -1,0 +1,472 @@
+<!-- 
+
+Copyright (c) 2013, salesforce.com, Inc. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification, 
+are permitted provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright notice, 
+    this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright notice, 
+    this list of conditions and the following disclaimer in the documentation 
+    and/or other materials provided with the distribution.
+    * Neither the name of the salesforce.com, Inc. nor the names of its contributors 
+    may be used to endorse or promote products derived from this software 
+    without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. 
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, 
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, 
+BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, 
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE 
+OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED 
+OF THE POSSIBILITY OF SUCH DAMAGE.
+
+-->
+
+<apex:component>
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+<script type="x-template" id="ShareViewTemplate">
+    <div class="dropdownWrapper">
+        <div class="btn-group dropDown">
+            <a class="myFeedBtn btn dropdown-toggle" data-toggle="dropdown">
+                <span class="selectedValue">Which user or group are you posting to?</span>
+                <img class="groupIcon" src="{!URLFOR($Resource.MyChartsZip,'/images/picklistMentionIcon@2x.png')}" />
+            </a>
+            <ul class="dropdown-menu" role="menu" aria-labelledby="dropdownMenu">
+                <li><a href="#">my feed</a></li>
+            </ul>
+        </div>
+    </div>
+    <div class="infoWrapper">
+        <span class="chartTitle"></span>
+        <img class="chartImg" />
+    </div>
+    <div class="commentWrapper">
+        <textarea type="text" rows="1" placeholder="Add a comment" class="sharePostText"></textarea>
+    </div>
+
+    <div class="btnWrapper clearfix">
+        <button class="postBtn btn btn-info btn-primary pull-right" type="button">Post</button>
+        <button class="cancelBtn btn pull-left" type="button">Cancel</button>
+        <% if (isMobile()) { %>
+        <img class="loading"
+             src="{!URLFOR($Resource.MyChartsZip,'/images/loading-gray.gif')}" />
+        <% } else { %>
+        <img class="loading"
+             src="{!URLFOR($Resource.MyChartsZip,'/images/loading-white.gif')}" />
+        <% } %>
+        <span class="success">Success!</span>
+        <span class="error">Share failed.</span>
+    </div>
+</script>
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+<style>
+
+.shareView {
+    height: 330px;
+
+    /* clears min-height from share page css */
+    min-height: 0px !important;
+}
+
+.shareView .loading,
+.shareView .success,
+.shareView .error {
+    display:none;
+}
+
+.shareView .loading {
+    width:30px;
+    height:30px;
+    margin-left: 10px;
+}
+
+.shareView .success {
+    font-weight:bold;
+    line-height: 30px;
+    color: #444;
+}
+
+.shareView .error {
+    font-weight:bold;
+    color:red;
+    line-height: 30px;
+    padding-left: 10px;
+}
+
+/* .dropdown manipulates bootstrap styles */
+.shareView .dropdown {
+    text-align: left;
+}
+
+.shareView .dropdown li a {
+    text-align:left;
+}
+
+.shareView .dropdown-menu {
+    max-height: 150px;
+    overflow:auto;
+}
+
+.shareView .dropdownWrapper {
+    margin:14px;
+}
+
+.shareView .dropDown {
+    width:100%;
+}
+
+.shareView .groupIcon {
+    width: 16px;
+    height: 16px;
+}
+
+.shareView .selectedValue {
+    padding: 14px;
+    font-size: 12px;
+}
+
+.shareView .myFeedBtn {
+    width:100%;
+    padding:10px 0px;
+    text-align: left;
+}
+
+.shareView .infoWrapper {
+
+    margin:14px;
+    padding:7px;
+    text-align: center;
+}
+
+.shareView .chartImg {
+    width:64px;
+    max-height:64px;
+    border:0px solid #bbc0c4;
+    border-radius:4px;
+    box-shadow: 0px 2px 10px #aaa;
+}
+
+.shareView .chartTitle {
+   font-size: 12px;
+   vertical-align:top;
+   display: block;
+}
+
+.shareView .commentWrapper {
+   margin:14px;
+}
+
+.shareView .sharePostText {
+    box-sizing:border-box;
+    -moz-box-sizing:border-box;
+    width:100%;
+    color:#696e71;
+    padding:10px;
+    rows:1;
+    resize:none;
+    border-radius:4px;
+    border:1px solid #bbc0c4;
+    font-size: 14px;
+}
+
+.shareView .postBtn {
+    margin-left: 14px;
+    float: right;
+    min-width: 100px;
+}
+
+.shareView .cancelBtn {
+    min-width: 100px;
+}
+
+.shareView .btnWrapper {
+    margin: 14px;
+}
+
+.borderedChartApp.shareView .chartImg {
+    width:auto;
+    max-height:none;
+    border:none;
+    border-radius:0px;
+    padding-right:0;
+    box-shadow:none;
+}
+
+.borderedChartApp.shareView .infoWrapper {
+    height:auto;
+    margin:14px;
+    padding:7px;
+    text-align: center;
+    box-shadow:none;
+    border-radius:4px;
+    border: 1px solid #bbc0c4;
+    background: #fff;
+}
+
+.borderedChartApp.shareView {
+    height:auto !important;
+    min-height:none !important;
+    width:350px !important;
+    margin-left:-175px !important;
+
+    /* match the loading gif background color */
+    background-color: #efefef;
+}
+
+.borderedChartApp.shareView .chartTitle {
+    display: block;
+    font-size: 18px;
+    line-height: 22px;
+    color: #666;
+    font-weight: bold;
+    margin-bottom: 15px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+    margin: 14px;
+    margin-top: 0px;
+    text-align: center;
+}
+
+@media (max-device-width: 568px) {
+
+    .shareView .infoWrapper {
+        border-radius:4px;
+        border: 1px solid #bbc0c4;
+        background: #fff;
+        height: auto;
+    }
+
+    .shareView .chartImg {
+        width:200px;
+        max-height:144px;
+        border:none;
+        border-radius:none;
+        padding-right: 8px;
+        box-shadow: none;
+    }
+
+    .shareView .chartTitle {
+        text-align:center;
+        width:100%;
+        height:auto;
+        line-height:1;
+        vertical-align:top;
+        margin-bottom: 12px;
+    }
+
+    .shareView .commentWrapper {
+        height:40px;
+    }
+
+    .shareView .sharePostText {
+        background-color:#e8eaeb;
+        font-size: 12px;
+    }
+
+    .shareView .postBtn {
+        margin-left:0px;
+        float: none;
+    }
+
+    .shareView .cancelBtn {
+        display: none;
+    }
+
+}
+
+@media (min-device-width: 768px)
+and (max-device-width: 1024px) {
+
+    .shareView {
+        margin: 0 auto;
+        width: 500px;
+    }
+
+    .shareView .chartTitle {
+        font-size: 16px;
+    }
+
+    .shareView .chartImg {
+        width: auto;
+        max-height: none;
+        margin: 15px;
+    }
+
+}
+</style>
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+<script>
+
+;(function() {
+
+    var app = window.MyCharts = window.MyCharts || {};
+
+    /*********************************************************************/
+
+    app.ShareView = Marionette.ItemView.extend({
+        className: 'shareView',
+        template: '#ShareViewTemplate',
+        templateHelpers: {
+            isMobile: function() {
+                return app.isMobile();
+            }
+        },
+
+        /*****************************************************************/
+
+        initialize: function(params) {
+            this._text = params.text;
+            this._id = params.id;
+            this._title = params.title;
+            this._imgData = params.imgData;
+            this._api = params.api;
+        },
+
+        /*****************************************************************/
+
+        onRender: function() {
+            var self = this;
+
+            var $chartImg = this.$('.chartImg');
+            $chartImg.attr('src', self._imgData);
+            this.$('.chartTitle').text(self._title);
+            var $dropdown = self.$('.dropDown');
+            var $menu = $dropdown.find('.dropdown-menu');
+
+            var chatterGroups = [],
+            chatterSelectedGroup = -1,
+            $dropdown = self.$('.dropDown');
+
+            function wireGroupClickHandler() {
+                $dropdown.on('click', 'li a', function() {
+
+                    // Update the dropdown control to display the newly selected item.
+                    var $this = $(this);
+                    $this
+                        .parents('.btn-group')
+                        .find('.selectedValue')
+                        .text($this.text())
+                        .val($this.text());
+
+                    chatterSelectedGroup = $this.parent().index() - 1;
+
+                    $this
+                        .parents('.dropDown')
+                        .find('.dropdown-toggle')
+                        .dropdown('toggle');
+
+                    return false;
+                });
+            }
+
+            getChatterGroups(this._api, function(data, textStatus, xhr){
+                if (data && data.groups) {
+                    chatterGroups = data.groups;
+                    var $menu = $dropdown.find('.dropdown-menu');
+
+                    // and populate it...
+                    _.each(data.groups, function(group, idx) {
+                        $menu.append('<li><a href="#">' + group.name + '</a></li>');
+                    });
+                }
+                wireGroupClickHandler();
+            }, function(xhr, textStatus, error) {
+                wireGroupClickHandler();
+            });
+
+            self.$('.postBtn').click(function() {
+                self.$('.loading').show();
+                self.$('.postBtn').attr('disabled', 'disabled');
+
+                var text = self.$('.sharePostText').val() || "";
+                var post = new app.ChatterPost({
+                    message: text,
+                    imgData: self._imgData,
+                    chartId: self._id,
+                    title: self._title,
+                    groupId: chatterSelectedGroup >= 0
+                        ? chatterGroups[chatterSelectedGroup].id
+                        : null
+                });
+
+                post.save(null, {
+                    wait: true,
+                    success: function(model, response, options) {
+                        self.$('.loading').hide();
+                        self.$('.success').show();
+                        self.trigger('posted');
+                    },
+                    error: function(model, xhr, options) {
+                        self.$('.loading').hide();
+                        self.$('.error').show();
+                        setTimeout(function() {
+                            self.$('.error').hide();
+                            self.$('.postBtn').removeAttr('disabled');
+                        }, 2000);
+                    }
+                });
+            });
+
+            self.$('.cancelBtn').click(function() {
+                self.trigger('close');
+                return false;
+            });
+        }
+    });
+
+    /*********************************************************************/
+
+    function getChatterGroups(api, success, error) {
+        var path = '/chatter/users/me/groups';
+        var url = api.client.instanceUrl + '/services/data/' +
+            api.client.apiVersion + path;
+
+        $.ajax({
+            type: 'GET',
+            async: api.client.asyncAjax,
+            url: url,
+            success: success,
+            error: (!api.client.refreshToken || retry ) ? error :
+                function(jqXHR, textStatus, errorThrown) {
+                    if (jqXHR.status === 401) {
+                        api.client.refreshAccessToken(function(oauthResponse) {
+                            api.client.setSessionToken(oauthResponse.access_token, null,
+                                                       oauthResponse.instance_url);
+                        }, error);
+                    } else {
+                        error(jqXHR, textStatus, errorThrown);
+                    }
+                },
+            beforeSend: function(xhr, opts) {
+                if (api.client.proxyUrl !== null)
+                    xhr.setRequestHeader('SalesforceProxy-Endpoint', url);
+                xhr.setRequestHeader('Accept', 'application/json');
+                xhr.setRequestHeader(api.client.authzHeader, 'OAuth ' +
+                                     api.client.sessionId);
+                xhr.setRequestHeader('X-User-Agent',
+                                     'salesforce-toolkit-rest-javascript/' +
+                                     api.client.apiVersion);
+            }
+        });
+    }
+
+    /*********************************************************************/
+
+})();
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+</script>
+</apex:component>

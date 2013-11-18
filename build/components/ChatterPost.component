@@ -1,0 +1,189 @@
+<!-- 
+
+Copyright (c) 2013, salesforce.com, Inc. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification, 
+are permitted provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright notice, 
+    this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright notice, 
+    this list of conditions and the following disclaimer in the documentation 
+    and/or other materials provided with the distribution.
+    * Neither the name of the salesforce.com, Inc. nor the names of its contributors 
+    may be used to endorse or promote products derived from this software 
+    without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. 
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, 
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, 
+BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, 
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE 
+OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED 
+OF THE POSSIBILITY OF SUCH DAMAGE.
+
+-->
+
+<apex:component >
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+<script>
+;(function() {
+
+    var app = window.MyCharts = window.MyCharts || {};
+
+    /*********************************************************************/
+
+    function generateBoundary() {
+        var chars = '1234567890abcdefghijklmnopqrstuvwxyz' +
+            'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        var i, j, n = chars.length, l = [];
+        for (i = 0; i < 40; i++) {
+            j = Math.floor(Math.random() * n)
+            l.push(chars[j]);
+        }
+        return l.join('');
+    }
+
+    /*********************************************************************/
+
+    function makeJSON(title, text, chartUrl, includeThumb) {
+        var data = {
+            body: { messageSegments: [
+                { type: 'Text', text: text },
+                { type: 'Hashtag', tag: 'MyCharts' },
+                { type: 'Text', text: '\n' },
+                { type: 'Link', url: chartUrl }
+            ] }
+        };
+
+        if (includeThumb) {
+            data.attachment = {
+                attachmentType: 'NewFile',
+                description: title || 'My Chart',
+                title: 'chart'
+            };
+        }
+        return data;
+    }
+
+    /*********************************************************************/
+
+    function postToChatter(groupId, api, json, attachment, success, error, retry) {
+        var path = '/chatter/feeds/news/me/feed-items';
+        if (groupId != null) {
+            path = '/chatter/feeds/record/' + groupId + '/feed-items';
+        }
+
+        var url = api.client.instanceUrl + '/services/data/' +
+            api.client.apiVersion + path;
+        var boundary = generateBoundary();
+        var data = '--' + boundary + '\n' +
+            'Content-Disposition: form-data; name="json"\n' +
+            'Content-Type: application/json; charset=UTF-8\n\n' +
+            JSON.stringify(json) + '\n\n';
+
+        if (json.attachment) {
+            data += '--' + boundary + '\n' + 'Content-Disposition: form-data; ' +
+                'name="feedItemFileUpload"; filename="chart.png"\n' +
+                'Content-Type: application/octet-stream; charset=binary\n\n' +
+                atob(attachment) + '\n';
+        }
+        data += '--' + boundary + '--\n';
+
+        $.ajax({
+            type: 'POST',
+            async: api.client.asyncAjax,
+            url: url,
+            contentType: 'multipart/form-data; boundary=' + boundary,
+            cache: false,
+            processData: false,
+            data: data,
+            success: success,
+            error: (!api.client.refreshToken || retry ) ? error :
+                function(jqXHR, textStatus, errorThrown) {
+                    if (jqXHR.status === 401) {
+                        api.client.refreshAccessToken(function(oauthResponse) {
+                            api.client.setSessionToken(oauthResponse.access_token, null,
+                                                       oauthResponse.instance_url);
+                            postToChatter(json, attachment, success, error, true);
+                        }, error);
+                    } else {
+                        error(jqXHR, textStatus, errorThrown);
+                    }
+                },
+            dataType: "json",
+            beforeSend: function(xhr, opts) {
+                if (api.client.proxyUrl !== null) {
+                    xhr.setRequestHeader('SalesforceProxy-Endpoint', url);
+                }
+                xhr.setRequestHeader('Accept', 'application/json');
+                xhr.setRequestHeader(api.client.authzHeader, "OAuth " +
+                                     api.client.sessionId);
+                xhr.setRequestHeader('X-User-Agent',
+                                     'salesforce-toolkit-rest-javascript/' +
+                                     api.client.apiVersion);
+
+                if (json.attachment) {
+                    var data = opts.data;
+                    var nBytes = data.length, ui8Data = new Uint8Array(nBytes);
+                    for (var nIdx = 0; nIdx < nBytes; nIdx++) {
+                        ui8Data[nIdx] = data.charCodeAt(nIdx) & 0xff;
+                    }
+                    var userAgent = navigator.userAgent.toLowerCase();
+                    if (userAgent.indexOf('safari') >= 0 &&
+                        userAgent.indexOf('chrome') < 0 ||
+                        userAgent.indexOf('iphone') >= 0) {
+                        opts.data = ui8Data.buffer;
+                    }
+                    else {
+                        opts.data = ui8Data;
+                    }
+                }
+            }
+        });
+    }
+
+    /*********************************************************************/
+
+    app.ChatterPost = Backbone.Model.extend({
+        sync: function(method, model, options) {
+            switch(method) {
+            case 'create':
+                var includeThumb = (typeof Uint8Array !== 'undefined')
+                    && window.atob;
+                // chatter URLs can't be relative.
+                var pageName =  app.Api.client.apexPrefix + 'MyCharts';
+                var chartUrl =  app.Api.client.baseUrl +
+                    pageName + '?chart=' + this.get('chartId');
+                var json = makeJSON(this.get('title'),
+                                    this.get('message') || '', chartUrl, includeThumb);
+                var imgData = this.get('imgData').split(',')[1] || null;
+                var groupId = this.get('groupId') || null;
+
+                postToChatter(
+                    groupId, app.Api, json, imgData,
+                    function(data, status) {
+                        options.success();
+                    },
+                    function(xhr, status, err) {
+                        options.error(err);
+                    });
+                break;
+            }
+        }
+    });
+
+    /*********************************************************************/
+
+})();
+
+</script>
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+</apex:component>

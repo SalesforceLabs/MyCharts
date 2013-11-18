@@ -1,0 +1,190 @@
+<!-- 
+
+Copyright (c) 2013, salesforce.com, Inc. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification, 
+are permitted provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright notice, 
+    this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright notice, 
+    this list of conditions and the following disclaimer in the documentation 
+    and/or other materials provided with the distribution.
+    * Neither the name of the salesforce.com, Inc. nor the names of its contributors 
+    may be used to endorse or promote products derived from this software 
+    without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. 
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, 
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, 
+BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, 
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE 
+OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED 
+OF THE POSSIBILITY OF SUCH DAMAGE.
+
+-->
+
+<apex:component >
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+<!-- The only difference in the two templates is the relative
+     order of the input element compared to the buttons.  -->
+
+<script type="x-template" id="EditControlsViewTemplate">
+    <div class="clearfix saveOrCancelContainer">
+        <input class="chartNameInput pull-left"
+            type="text" maxlength="80"
+            placeholder="Enter name for chart..." />
+        <button class="btn saveButton btn-info pull-right">Save</button>
+        <button class="btn cancelButton pull-right">Cancel</button>
+    </div>
+    <div class="pickerRegion"></div>
+</script>
+
+<script type="x-template" id="EditControlsMobileViewTemplate">
+    <div class="clearfix saveOrCancelContainer">
+        <button data-trigger="save"
+            class="btn saveButton btn-info pull-right">Save</button>
+        <button data-trigger="cancel"
+            class="btn cancelButton pull-right">Cancel</button>
+        <input class="chartNameInput pull-left"
+            type="text" maxlength="80"
+            placeholder="Enter name for chart..." />
+    </div>
+    <div class="pickerRegion"></div>
+</script>
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+<style>
+    .editControlsView {
+        overflow: visible;
+        position:relative;
+    }
+    .mobile .editControlsView {
+        width: 100%;
+    }
+
+    .editControlsView .saveOrCancelContainer {
+        margin-bottom:10px;
+        width:100%;
+    }
+    .mobile .editControlsView .saveOrCancelContainer {
+        margin-bottom: 14px;
+    }
+
+    .mobile .editControlsView .saveButton,
+    .mobile .editControlsView .cancelButton{
+        border-radius: 6px;
+        vertical-align:middle;
+        height: 30px;
+        text-align: center;
+    }
+
+    .editControlsView .saveButton{
+        margin-left:20px;
+    }
+    .mobile .editControlsView .saveButton {
+        border: 1px solid #1c78b1;
+        color: #ffffff;
+        background: -webkit-linear-gradient(bottom, #2789c7 0%, #3f9fd9 100%);
+    }
+
+    .mobile .editControlsView .cancelButton {
+        border: 1px solid #bbc0c4;
+        color: #44596c;
+        background: -webkit-linear-gradient(bottom, #f1f1f1 0%, #fff 100%);
+        float: left !important;
+        margin-left: 0 !important;
+    }
+
+    .editControlsView .saveOrCancelContainer .btn {
+        min-width: 100px;
+    }
+    .mobile .editControlsView .saveOrCancelContainer .btn {
+        min-width: 80px;
+        margin-top: 0;
+        margin-bottom:16px;
+    }
+
+    .editControlsView input.chartNameInput {
+        font-size: 20px;
+        width: 316px;
+        line-height: 22px;
+        height: 22px;
+    }
+    .mobile .editControlsView input.chartNameInput {
+        margin: 0;
+        width: 100%;
+        padding: 15px 8px;
+        box-sizing: border-box;
+    }
+
+    .editControlsView .pickerRegion {
+        text-align:center;
+    }
+    .mobile .editControlsView .pickerRegion {
+        margin-top: 20px;
+    }
+
+</style>
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+<script>
+;(function() {
+    var MyCharts = window.MyCharts = window.MyCharts || {};
+
+    MyCharts.EditControlsView = Marionette.Layout.extend({
+        className: 'editControlsView',
+        template: MyCharts.isMobile()
+            ? '#EditControlsMobileViewTemplate'
+            : '#EditControlsViewTemplate',
+        regions: {
+            pickerRegion: '.pickerRegion'
+        },
+        triggers: {
+            'click .cancelButton': 'cancel'
+        },
+        events: {
+            'click .saveButton': '_saveClicked',
+        },
+        ui: {
+            saveBtn: '.saveButton'
+        },
+
+        onRender: function() {
+            var self = this;
+            var pickerView = new MyCharts.ChartTypePickerView({
+                chartType: this.options.chartType,
+                mobile: MyCharts.isMobile()
+            });
+            pickerView.on('chartTypeChanged', function(chartType) {
+                self.ui.saveBtn.addClass('disabled');
+                self.trigger('chartTypeChanged', chartType, function(supported) {
+                    if (supported) {
+                        self.ui.saveBtn.removeClass('disabled');
+                    }
+                });
+            });
+            this.pickerRegion.show(pickerView);
+        },
+
+        _saveClicked: function() {
+            if (this.ui.saveBtn.hasClass('disabled')) {
+                return;
+            }
+            this.trigger('save');
+        }
+
+    });
+})();
+</script>
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+</apex:component>

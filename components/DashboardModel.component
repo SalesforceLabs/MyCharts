@@ -1,0 +1,97 @@
+<!-- 
+
+Copyright (c) 2013, salesforce.com, Inc. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification, 
+are permitted provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright notice, 
+    this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright notice, 
+    this list of conditions and the following disclaimer in the documentation 
+    and/or other materials provided with the distribution.
+    * Neither the name of the salesforce.com, Inc. nor the names of its contributors 
+    may be used to endorse or promote products derived from this software 
+    without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. 
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, 
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, 
+BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, 
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE 
+OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED 
+OF THE POSSIBILITY OF SUCH DAMAGE.
+
+-->
+
+<apex:component >
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+<script>
+;(function() {
+    var MyCharts = window.MyCharts = window.MyCharts || {};
+
+    MyCharts.Dashboard = Backbone.Collection.extend({
+        model: MyCharts.Chart,
+
+        initialize: function(params) {
+            this._params = params;
+        },
+
+        sync: function(method, model, options) {
+            var qs = this._params.qs;
+            var userId = this._params.userId;
+            var api = this._params.api;
+
+            if (method === 'read') {
+
+                var query = "SELECT Id, Name, apiVersion__c, " +
+                    "height__c, reportApiUrl__c, reportId__c, " +
+                    "state__c, type__c, OwnerId " +
+                    "FROM MyChart__c";
+
+                if (qs.user !== 'all') {
+                    query = query + " WHERE " + "OwnerId = '" +
+                        (qs.user || userId) + "'";
+                }
+                query = query + " ORDER BY LastModifiedDate DESC NULLS LAST";
+
+                api.client.query(query, function(result, status) {
+                    if (status === 'success' && result && result.records) {
+                        var collection = [], recs = result.records;
+
+                        for (var i = 0, n = recs.length; i < n; i++) {
+                            var rec = recs[i];
+                            collection.push({
+                                reportApiVersion: rec.apiVersion__c,
+                                height: rec.height__c,
+                                title: rec.Name,
+                                reportApiUrl: rec.reportApiUrl__c,
+                                reportId: rec.reportId__c,
+                                chartState: rec.state__c,
+                                chartType: rec.type__c,
+                                id: rec.Id,
+                                ownerId: rec.OwnerId,
+                                encodedState: encodeURIComponent(rec.state__c),
+                                imgData: rec.imgData__c || ''
+                            });
+                        }
+                        options.success(collection);
+                    }
+                    else {
+                        options.error();
+                    }
+                });
+            }
+        }
+    });
+})();
+</script>
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+</apex:component>

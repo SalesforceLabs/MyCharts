@@ -1,0 +1,191 @@
+<!-- 
+
+Copyright (c) 2013, salesforce.com, Inc. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification, 
+are permitted provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright notice, 
+    this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright notice, 
+    this list of conditions and the following disclaimer in the documentation 
+    and/or other materials provided with the distribution.
+    * Neither the name of the salesforce.com, Inc. nor the names of its contributors 
+    may be used to endorse or promote products derived from this software 
+    without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. 
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, 
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, 
+BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, 
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE 
+OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED 
+OF THE POSSIBILITY OF SUCH DAMAGE.
+
+-->
+
+<apex:component >
+
+    <!-- ChartView is the parent class for a view that encapsulates a google chart
+         and the relevant state to render it. Overridden by children specific to
+         a type of chart -->
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+<script type="x-template" id="ChartViewTemplate">
+    <div class="chartyPants"></div>
+</script>
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+<style>
+
+/* We must fix the size of the charts so that they are consistently rendered.
+Within a google chart, the width of the SVG will always be 10 pixels less
+than the chartyPants width.  We choose the two WxH geometries so that they
+yield identical aspect ratios.  We also want the W-10 to be at least 280
+since that is currently the maximum dimension size allowed for the raw
+images. */
+.chartyPants {
+    width: 570px;
+    height: 420px;
+}
+.mobile .chartyPants {
+    width: 290px;
+    height: 210px;
+    display: inline-block;
+}
+.notSupported {
+    font-size: 14px;
+    padding: 0px 10px;
+    line-height: 1.5;
+    margin-top: 75px;
+}
+
+</style>
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+<script>
+;(function() {
+    var MyCharts = window.MyCharts = window.MyCharts || {};
+    MyCharts.ChartView = Marionette.ItemView.extend({
+
+        constructor: function() {
+            this.className = 'chartView';
+            this.template = _.template($('#ChartViewTemplate').html());
+            this._reportData = null;
+            this._chart = null;
+            this._type = null;
+            this._groupings = [];
+            this._aggregates = [];
+            this._options = {
+                colors: ['#76b4c4', // blue
+                         '#de4f38', // red
+                         '#96af57', // green
+                         '#f08629', // orange
+                         '#8056a3', // purple
+                         '#f2c04c', // yellow
+                         '#f078a1', // pink
+                         '#a8cfbc', // light blue
+                         '#a5776b' ], // brown
+                titleTextSize: {
+                    fontSize: 30,
+                    'font-name': 'ProximaNovaSoft-Regular'
+                },
+                legend: {
+                    position: 'bottom'
+                },
+                hAxis: {
+                    textStyle: {
+                        'font-name': 'ProximaNovaSoft-Regular'
+                    }
+                },
+                vAxis: {
+                    textStyle: {
+                        'font-name': 'ProximaNovaSoft-Regular'
+                    }
+                }
+            };
+            Backbone.View.apply(this, arguments);
+        },
+
+        /*****************************************************************/
+
+        onRender: function() {
+            var self = this;
+
+            // If we can't render a chart based on the data, show
+            // the unsupported notification
+            if (!this._supportsData()) {
+                this._showUnsupportedMessage();
+                return;
+            }
+
+            // Create and display the chart
+            this._createChart(function() {
+                self._updateChart();
+            });
+        },
+
+        /*****************************************************************/
+
+        remove: function() {
+            if (this._chart) {
+                google.visualization.events.removeAllListeners(this._chart);
+            }
+            this.$el.remove();
+            return this;
+        },
+
+        /*****************************************************************/
+
+        setType: function(type) {
+            this._type = type;
+            if (!this._supportsData())
+                this._showUnsupportedMessage();
+        },
+
+        getType: function() {
+            return this._type;
+        },
+
+        /*****************************************************************/
+
+        getVisualState: function() {
+            return { groupings: this._groupings,
+                     aggregates: this._aggregates };
+        },
+
+        setVisualState: function(state) {
+            this._groupings = state.groupings;
+            this._aggregates = state.aggregates;
+        },
+
+        /*****************************************************************/
+
+        _supportsData: function() {
+            return this._reportData && !this._reportData.isBad 
+                && this.supportsData();
+        },
+
+        supportsData: function() {
+            return true;
+        },
+
+        /*****************************************************************/
+
+        _showUnsupportedMessage: function() {
+            this.$el.html('<div class="notSupported">' +
+                          'Report cannot be viewed with this chart type.</div>');
+        }
+    });
+})();
+</script>
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+</apex:component>

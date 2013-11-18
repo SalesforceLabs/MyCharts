@@ -1,0 +1,423 @@
+<project name="Build a force.com project with ant"
+         default="all" basedir="." xmlns:sf="antlib:com.salesforce">
+
+  <description>
+    This ant script can be used to build and deploy a project on force.com with
+    minimal fuss.  Basically, you put your stuff into local directories, fill in
+    basic config settings in the build.properties file, and then run 'ant all'.
+
+    If you are brave, you can also 'ant fetch' to pull down a package and
+    overwrite the local contents.
+
+    If you've defined multiple profiles, you can switch profiles by using 'ant
+    -Dprofile=X' where X is the name of the profile, allowing multiple team
+    members to easily share the same project.
+
+    See the Readme.md file for a more complete description.
+  </description>
+
+  <taskdef resource="net/sf/antcontrib/antcontrib.properties"/>
+  <property file="build.properties"/>
+  <property environment="env"/>
+
+  <property name="maxPoll" value="20"/>
+  <property name="buildDir" value="build"/>
+  <property name="fetchDir" value="fetch"/>
+
+
+  <!-- The 'types' property is a list of the types of things that will
+       be built by this ant script.  You can add new types to this
+       list, but here are some assumptions that I've made in the build
+       process that you'll want to keep in mind:
+
+1. All objects of TYPE should be stored in the TYPEs
+subdirectory (i.e., TYPE is pluralized by appending an 's').
+
+2. Files of TYPE should have a suffix of ".TYPE".
+
+3. The metadata for BASENAME.TYPE should be stored in the TYPEs
+subdirectory in the file BASENAME.TYPE-meta.xml.
+
+4. The templates directory will have a file named TYPE-meta.xml
+which gives the basic structure of a metadata file for TYPE.
+The templates may use %LABEL% as a special symbol that will
+be replaced with the BASENAME of the file.
+
+5. There must exist a property below named XMLtype.TYPE with
+a value equal to the XML tag name for that type.
+
+As long as the list above is satisfied, you should be able to
+add a new type to this build process by simply adding the type
+to the 'types' list below, and then adding a new property for
+that type per step 5 above.
+
+  -->
+
+  <property name="types" value="page,component,object,layout,tab,quickAction,document,profile"/>
+  <property name="XMLtype.page" value="ApexPage" />
+  <property name="XMLtype.component" value="ApexComponent" />
+  <property name="XMLtype.object" value="CustomObject" />
+  <property name="XMLtype.layout" value="Layout" />
+  <property name="XMLtype.tab" value="CustomTab" />
+  <property name="XMLtype.profile" value="Profile" />
+  <property name="XMLtype.quickAction" value="QuickAction" />
+  <property name="XMLtype.document" value="Document" />
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+  <target name="xslt">
+    <xslt style="templates/customfield.xsl" destdir="tmp" basedir="objects"
+          extension=".txt" filenameparameter="filename"/>
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+  <target name="help">
+    <echo message="Use 'ant -p' to see help."/>
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+  <target name="setProfile">
+    <if>
+      <isset property="profile" />
+      <else>
+        <exec executable="whoami" outputproperty="profile" />
+      </else>
+    </if>
+
+    <fail unless="profile">'profile' is undefined.
+    Please make sure that 'whois' is in your path (or that you use -D=profile=X
+    when you start your build) and that you define a proper profile in the
+    build.properties file.
+    </fail>
+    <echo message="profile is ${profile}" />
+    <fail unless="profiles.${profile}.username">
+      Missing 'profiles.${profile}.username'
+      in build.properties file.
+    </fail>
+    <fail unless="profiles.${profile}.serverUrl">
+      Missing 'profiles.${profile}.serverUrl
+      in build.properties file.
+    </fail>
+
+    <propertycopy name="username" from="profiles.${profile}.username" />
+    <propertycopy name="serverUrl" from="profiles.${profile}.serverUrl" />
+
+    <if>
+      <isset property="profiles.${profile}.password" />
+      <then>
+        <propertycopy name="password" from="profiles.${profile}.password" />
+      </then>
+      <else>
+        <input message="${line.separator}Enter password for ${username}: "
+               addproperty="password">
+          <handler type="secure" />
+        </input>
+      </else>
+    </if>
+
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+  <target name="buildStatic">
+    <local name="base" />
+    <mkdir dir="${buildDir}/staticresources"/>
+    <copy todir="${buildDir}/staticresources">
+      <fileset dir="staticresources"/>
+    </copy>
+    <zip destfile="${buildDir}/staticresources/${staticName}.resource"
+         basedir="static" />
+    <copy file="templates/resource-meta.xml"
+          tofile="${buildDir}/staticresources/${staticName}.resource-meta.xml" />
+    <delete file="${buildDir}/static.temp" />
+    <echo file="${buildDir}/static.temp" append="true">&lt;types&gt;
+      &lt;members&gt;${staticName}&lt;/members&gt;
+</echo>
+    <for param="filename">
+      <path>
+        <fileset dir="staticresources">
+          <filename name="**/*.resource"/>
+        </fileset>
+      </path>
+      <sequential>
+        <basename property="base" file="@{filename}" suffix=".resource"/>
+
+        <echo file="${buildDir}/static.temp" append="true">      &lt;members&gt;${base}&lt;/members&gt;
+</echo>
+      </sequential>
+  </for>
+    <echo file="${buildDir}/static.temp" append="true">      &lt;name&gt;StaticResource&lt;/name&gt;
+    &lt;/types&gt;
+  </echo>
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+  <target name="buildCustomFields">
+    <local name="tmpFile" />
+    <property name="tmpFile" value="${buildDir}/customfields.temp" />
+    <delete file="${tmpFile}" />
+    <delete dir="${buildDir}/tmp" />
+    <mkdir dir="${buildDir}/tmp"/>
+    <xslt style="templates/customfield.xsl" destdir="${buildDir}/tmp"
+          basedir="objects" extension=".txt" filenameparameter="filename"/>
+    <echo file="${tmpFile}" append="true"
+          message="  &lt;types&gt;${line.separator}" />
+    <concat destfile="${tmpFile}" append="true">
+      <fileset dir="${buildDir}/tmp" casesensitive="yes" includes="*.txt" />
+    </concat>
+    <echo file="${tmpFile}" append="true">    &lt;name&gt;CustomField&lt;/name&gt;
+    &lt;/types&gt;
+    </echo>
+    <delete dir="${buildDir}/tmp" />
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+  <target name="buildNamedFilters">
+    <local name="tmpFile" />
+    <property name="tmpFile" value="${buildDir}/namedfilters.temp" />
+    <delete file="${tmpFile}" />
+    <delete dir="${buildDir}/tmp" />
+    <mkdir dir="${buildDir}/tmp"/>
+    <xslt style="templates/namedfilters.xsl" destdir="${buildDir}/tmp"
+          basedir="objects" extension=".txt" filenameparameter="filename"/>
+    <echo file="${tmpFile}" append="true"
+          message="  &lt;types&gt;${line.separator}" />
+    <concat destfile="${tmpFile}" append="true">
+      <fileset dir="${buildDir}/tmp" casesensitive="yes" includes="*.txt" />
+    </concat>
+    <echo file="${tmpFile}" append="true">    &lt;name&gt;NamedFilter&lt;/name&gt;
+    &lt;/types&gt;
+    </echo>
+    <delete dir="${buildDir}/tmp" />
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+  <target name="buildItem">
+    <echo message="${filename}" />
+    <basename property="base" file="${filename}" suffix=".${type}"/>
+    <propertyregex property="label" override="true" input="${base}"
+                   regexp="[^A-Za-z0-9 _-]+" replace="" global="true"
+                   defaultValue="${base}" />
+    <if>
+      <available file="templates/${type}-meta.xml" />
+      <then>
+        <copy file="templates/${type}-meta.xml"
+              tofile="${buildDir}/${type}s/${base}.${type}-meta.xml" />
+        <replace file="${buildDir}/${type}s/${base}.${type}-meta.xml"
+                 token="%LABEL%" value="${label}" />
+      </then>
+    </if>
+    <echo file="${tmpFile}" append="true"
+          message="    &lt;members&gt;${label}&lt;/members&gt;"  />
+    <echo file="${tmpFile}" append="true" message="${line.separator}" />
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+  <target name="buildDocItem">
+    <echo message="${filename}" />
+    <property name="longfile" value="${filename}" />
+    <loadresource property="shortfile">
+      <propertyresource name="longfile"/>
+      <filterchain>
+        <tokenfilter>
+          <filetokenizer/>
+          <replacestring from="${user.dir}/documents/" to=""/>
+        </tokenfilter>
+      </filterchain>
+    </loadresource>
+    <echo file="${tmpFile}" append="true"
+          message="    &lt;members&gt;${shortfile}&lt;/members&gt;"  />
+    <echo file="${tmpFile}" append="true" message="${line.separator}" />
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+  <target name="buildItems">
+    <!-- assumes plural name is formed by appending an 's' -->
+    <local name="tmpFile" />
+    <property name="tmpFile" value="${buildDir}/${type}.temp" />
+    <copy todir="${buildDir}/${type}s">
+      <fileset dir="${type}s"/>
+    </copy>
+    <delete file="${tmpFile}" />
+    <echo file="${tmpFile}" append="true"
+          message="  &lt;types&gt;${line.separator}" />
+    <if><equals arg1="${type}" arg2="document" />
+    <then>
+      <for param="filename">
+        <path>
+          <dirset dir="${type}s" >
+            <depth min="0" />
+          </dirset>
+          <fileset dir="${type}s">
+            <filename negate="true" name="**/*.xml"/>
+          </fileset>
+        </path>
+        <sequential>
+          <antcall target="buildDocItem" inheritAll="true">
+            <param name="filename" value="@{filename}" />
+            <param name="tmpFile" value="${tmpFile}" />
+          </antcall>
+        </sequential>
+      </for>
+    </then>
+    <else>
+      <for param="filename">
+        <path>
+          <fileset dir="${type}s" casesensitive="yes" includes="*.${type}" />
+        </path>
+        <sequential>
+          <antcall target="buildItem" inheritAll="true">
+            <param name="filename" value="@{filename}" />
+            <param name="type" value="${type}" />
+            <param name="tmpFile" value="${tmpFile}" />
+          </antcall>
+        </sequential>
+      </for>
+    </else>
+    </if>
+    <fail unless="XMLtype.${type}"
+          message="XMLtype.${type} us undefined." />
+    <propertycopy name="xmltype"  from="XMLtype.${type}"/>
+    <echo file="${tmpFile}" append="true">    &lt;name&gt;${xmltype}&lt;/name&gt;
+    &lt;/types&gt;
+    </echo>
+
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+  <target name="buildPackage" depends="buildStatic">
+    <local name="tmpFile" />
+    <property name="tmpFile" value="${buildDir}/package.temp" />
+    <delete file="${tmpFile}" />
+    <echo file="${tmpFile}" append="true"
+          message="  &lt;fullName&gt;${packageName}&lt;/fullName&gt;" />
+    <echo file="${tmpFile}" append="true" message="${line.separator}" />
+
+    <for list="${types}" param="type">
+      <sequential>
+        <antcall target="buildItems">
+          <param name="type" value="@{type}"/>
+        </antcall>
+        <concat destfile="${tmpFile}" append="true">
+          <filelist dir="${buildDir}" files="@{type}.temp" />
+        </concat>
+        <if><equals arg1="@{type}" arg2="object"/>
+        <then>
+          <antcall target="buildCustomFields" />
+          <!--
+          <antcall target="buildNamedFilters" />
+          -->
+          <concat destfile="${tmpFile}" append="true">
+            <filelist dir="${buildDir}" files="customfields.temp" />
+            <!--
+            <filelist dir="${buildDir}" files="namedfilters.temp" />
+            -->
+          </concat>
+        </then>
+        </if>
+      </sequential>
+    </for>
+
+    <concat destfile="${tmpFile}" append="true">
+      <filelist dir="${buildDir}" files="static.temp" />
+    </concat>
+
+    <loadfile srcFile="${tmpFile}" property="content" />
+
+    <if><equals arg1="${profile}" arg2="prod" />
+      <then>
+        <copy file="templates/package-prod.xml"
+              tofile="${buildDir}/package.xml" />
+      </then>
+      <else>
+        <copy file="templates/package.xml"
+              tofile="${buildDir}/package.xml" />
+      </else>
+    </if>
+
+    <replace file="${buildDir}/package.xml"
+             token="%CONTENTS%" value="${content}" />
+
+    <delete>
+      <fileset dir="${buildDir}" includes="*.temp" />
+    </delete>
+
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+  <target name="clean"
+          description="Remove the debris left over from a build.">
+    <delete dir="${buildDir}" />
+    <delete dir="${fetchDir}" />
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+  <target name="deploy" depends="setProfile"
+          description="Push a build directory to force.com.">
+    <sf:deploy username="${username}"
+               password="${password}"
+               serverurl="${serverUrl}"
+               maxPoll="${maxPoll}"
+               deployRoot="${buildDir}" />
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+  <target name="build" depends="clean,buildPackage"
+          description="Create a build directory and all of it's content.">
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+  <target name="retrieve" depends="setProfile"
+          description="Nondestructively pull the package from force.com.">
+    <delete dir="${fetchDir}" />
+    <mkdir dir="${fetchDir}" />
+    <sf:retrieve username="${username}" password="${password}"
+                 serverurl="${serverUrl}" maxPoll="${maxPoll}"
+                 retrieveTarget="${fetchDir}" packageNames="${packageName}"/>
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+  <target name="copyItems">
+    <copy todir="${type}s">
+      <fileset dir="${fetchDir}/${type}s" includes="**/*.${type}"/>
+    </copy>
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+  <target name="fetch" depends="retrieve"
+          description="Destructively overwrite local source with a retrieved package.">
+    <unzip src="${fetchDir}/staticresources/${staticName}.resource"
+           dest="static" overwrite="true" />
+    <for list="${types}" param="type">
+      <sequential>
+        <antcall target="copyItems">
+          <param name="type" value="@{type}"/>
+        </antcall>
+      </sequential>
+    </for>
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+  <target name="all" depends="build,deploy"
+          description="Clean, build, and then deploy a package.">
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+
+</project>

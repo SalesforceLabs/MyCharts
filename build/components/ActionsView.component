@@ -1,0 +1,224 @@
+<!-- 
+
+Copyright (c) 2013, salesforce.com, Inc. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification, 
+are permitted provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright notice, 
+    this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright notice, 
+    this list of conditions and the following disclaimer in the documentation 
+    and/or other materials provided with the distribution.
+    * Neither the name of the salesforce.com, Inc. nor the names of its contributors 
+    may be used to endorse or promote products derived from this software 
+    without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. 
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, 
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, 
+BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, 
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE 
+OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED 
+OF THE POSSIBILITY OF SUCH DAMAGE.
+
+-->
+
+<apex:component >
+
+<!--
+
+  An ActionsView is the piece of UI that contains the "share", "edit",
+  and   "delete" buttons.  It appears in three different forms: the small
+  static charts on the dashboard page, larger live charts on desktop, and
+  live charts foot in mobile.
+
+-->
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+<script type="x-template" id="ActionsViewTemplate">
+    <a class="actionButton share" href="#">
+        <i class="shareSprite"></i>
+    </a>
+    <a class="actionButton edit" href="#">
+        <i class="editSprite"></i>
+    </a>
+    <a class="actionButton delete" href="#">
+        <i class="deleteSprite"></i>
+    </a>
+</script>
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+<style>
+
+    .desktop .actionsView i {
+        display: inline-block;
+        background: url({!URLFOR($Resource.MyChartsZip,
+             '/images/actionsSprite@2x.png')}) no-repeat;
+        width:32px;
+        height:32px;
+    }
+
+    .desktop .actionsView .actionButton {
+        margin: 4px;
+    }
+
+    .desktop .actionsView .actionButton,
+    .desktop .actionsView .actionButton:hover {
+        text-decoration:none;
+        height:37px;
+    }
+
+    .desktop .actionsView .actionButton  .shareSprite {
+        background-position: 0px 0px;
+    }
+
+    .desktop .actionsView .actionButton  .shareSprite:hover {
+        background-position: 0px -36px;
+    }
+
+    .desktop .actionsView .actionButton .editSprite {
+        background-position: -38px 0px;
+    }
+
+    .desktop .actionsView .actionButton .editSprite:hover {
+        background-position: -38px -36px;
+    }
+
+    .desktop .actionsView .actionButton .deleteSprite {
+        background-position: -75px -0px;
+        float:right;
+    }
+
+    .desktop .actionsView .actionButton .deleteSprite:hover {
+        background-position: -75px -36px;
+    }
+
+    .actionsView .showOwnerControls {
+        display: inline !important;
+    }
+
+    .mobile .actionsView {
+        width: 100%;
+        height: 44px;
+        background-color: #474747;
+        position: fixed;
+        bottom: 0;
+        left:0;
+
+        /* Centers share button if del and edit are hidden */
+        text-align: center;
+    }
+
+    .mobile .actionsView .actionButton {
+        width: 32%;
+        height: 100%;
+        display: inline-block;
+        text-align: center;
+    }
+
+    .mobile .actionsView .actionButton i {
+        display: inline-block;
+        position: relative;
+        top: 13px;
+        width:18px;
+        height:18px;
+        background-size: 54px !important;
+        background: url({!URLFOR($Resource.MyChartsZip,
+             '/images/actionsSprite@2x.png')}) no-repeat;
+    }
+
+    .mobile .actionsView .actionButton .shareSprite {
+        background-position: 0px -36px;
+    }
+
+    .mobile .actionsView .actionButton .editSprite {
+        background-position: -18px -36px;
+    }
+
+    .mobile .actionsView .actionButton .deleteSprite {
+        background-position: -36px -36px;
+    }
+
+    /* Desktop + Mobile */
+    .actionsView .actionButton.edit,
+    .actionsView .actionButton.delete {
+        display: none;
+    }
+
+    .mobile .actionsView .showOwnerControls {
+        display: inline-block !important;
+    }
+
+</style>
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+<script>
+;(function() {
+
+    var MyCharts = window.MyCharts = window.MyCharts || {};
+
+    MyCharts.ActionsView = Marionette.ItemView.extend({
+        className: 'actionsView',
+        template: '#ActionsViewTemplate',
+        triggers: {
+            'click .actionButton.share': 'share',
+            'click .actionButton.edit': 'edit',
+            'click .actionButton.delete': 'delete'
+        },
+
+        delayShow: function() {
+            var self = this;
+            setTimeout(function() {
+                self.$('.actionControls').show();
+            }, 600);
+        },
+
+        onRender: function() {
+
+            var self = this;
+
+            function showOwnerOnlyControls() {
+                self.$('.actionButton.edit, .actionButton.delete').addClass('showOwnerControls');
+            }
+
+            function checkPermissions(chart) {
+                if ('{!$User.ID}' === chart.get('ownerId')) {
+                    showOwnerOnlyControls();
+                }
+            }
+
+            // Only check permissions on existing charts
+            if (this.options.chart.id) {
+                if (!this.options.chart.get('ownerId')) {
+                    this.options.chart.fetch({
+                        success: function() {
+                            checkPermissions(self.options.chart);
+                        },
+                        error: function(error) {
+
+                        }
+                    });
+                }
+                else {
+                    checkPermissions(this.options.chart);
+                }
+            }
+            else {
+                showOwnerOnlyControls();
+            }
+        }
+    });
+
+})();
+</script>
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+</apex:component>

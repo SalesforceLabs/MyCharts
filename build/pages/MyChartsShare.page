@@ -1,0 +1,149 @@
+<!-- 
+
+Copyright (c) 2013, salesforce.com, Inc. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification, 
+are permitted provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright notice, 
+    this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright notice, 
+    this list of conditions and the following disclaimer in the documentation 
+    and/or other materials provided with the distribution.
+    * Neither the name of the salesforce.com, Inc. nor the names of its contributors 
+    may be used to endorse or promote products derived from this software 
+    without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. 
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, 
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, 
+BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, 
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE 
+OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED 
+OF THE POSSIBILITY OF SUCH DAMAGE.
+
+-->
+
+<apex:page sidebar="false" standardStylesheets="false" showHeader="false">
+
+    <script type='text/javascript' src='/canvas/sdk/js/publisher.js'></script>
+
+    <apex:includeScript value="{!URLFOR($Resource.MyChartsZip, '/js/jquery.js')}" />
+    <apex:includeScript value="{!URLFOR($Resource.MyChartsZip, '/js/forcetkdetails.js')}" />
+    <apex:includeScript value="{!URLFOR($Resource.MyChartsZip, '/js/underscore.js')}" />
+    <apex:includeScript value="{!URLFOR($Resource.MyChartsZip, '/js/backbone.js')}" />
+    <apex:includeScript value="{!URLFOR($Resource.MyChartsZip, '/js/backbone.marionette.js')}" />
+    <apex:includeScript value="{!URLFOR($Resource.MyChartsZip, '/bootstrap/js/bootstrap.js')}"/>
+    <apex:includeScript value="{!URLFOR($Resource.MyChartsZip, '/js/common.js')}" />
+
+    <apex:stylesheet value="{!URLFOR($Resource.MyChartsZip, '/bootstrap/css/bootstrap.min.css')}"/>
+    <apex:stylesheet value="{!URLFOR($Resource.MyChartsZip, '/css/common.css')}"/>
+
+    <c:ChatterPost ></c:ChatterPost>
+    <c:ShareView ></c:ShareView>
+    <c:Chart ></c:Chart>
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+<div id="myChartsShareContent">
+    <div class="errorMessage">
+        The chart failed to load, please try again.
+    </div>
+</div>
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+<style>
+    body {
+        background:transparent;
+    }
+
+    #myChartsShareContent.error {
+        width: 600px;
+        height: 400px;
+        background-color: #fff;
+        margin: 0 auto;
+        margin-top: 40px;
+        border-radius: 8px;
+        text-align: center;
+    }
+
+    .mobile#myChartsShareContent.error {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        background-color: transparent;
+    }
+
+    #myChartsShareContent .errorMessage {
+        display: none;
+    }
+
+    #myChartsShareContent.error .errorMessage {
+        display: block;
+        font-size: 16px;
+        padding-top: 175px;
+    }
+
+</style>
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+<script>
+
+$(document).ready(function() {
+    var app = window.MyCharts = window.MyCharts || {},
+    qs = app.getQueryStrings(),
+    model = new app.Chart({ id: qs.chartId });
+
+    app.Api = app.createApi('{!$Api.Session_ID}', 'mycharts',
+                            '{!$CurrentPage.Name}');
+
+
+    model.fetch({
+        success: function(model) {
+            var shareView = new app.ShareView({
+                text: 'Check out this chart!',
+                id: model.id,
+                title: model.get('title') || '',
+                imgData: model.get('imgData') || '',
+                api: app.Api
+            });
+
+            $('#myChartsShareContent').append(shareView.$el);
+            shareView.on('posted close', function() {
+                if (MyCharts.isMobile()) {
+                    window.history.back();
+                }
+                else {
+                    window.parent.postMessage('closeShare', '*');
+                }
+            });
+
+            shareView.render();
+
+            if (!MyCharts.isMobile()) {
+                app.lightboxOnLoad(shareView.$el, false);
+            }
+        },
+        error: function(xhr, status, message) {
+            var $content = $('#myChartsShareContent');
+            $content.addClass('error');
+            if (MyCharts.isMobile()) {
+                $content.addClass('mobile');
+            }
+            else {
+                app.lightboxOnLoad();
+            }
+        }
+    });
+});
+
+</script>
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+</apex:page>

@@ -1,0 +1,218 @@
+<!-- 
+
+Copyright (c) 2013, salesforce.com, Inc. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification, 
+are permitted provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright notice, 
+    this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright notice, 
+    this list of conditions and the following disclaimer in the documentation 
+    and/or other materials provided with the distribution.
+    * Neither the name of the salesforce.com, Inc. nor the names of its contributors 
+    may be used to endorse or promote products derived from this software 
+    without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. 
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, 
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, 
+BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, 
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE 
+OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED 
+OF THE POSSIBILITY OF SUCH DAMAGE.
+
+-->
+
+<apex:component >
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+<script>
+;(function() {
+    var MyCharts = window.MyCharts = window.MyCharts || {};
+    
+    MyCharts.BarChartView = MyCharts.ChartView.extend({
+
+        initialize: function (params) {
+            this._reportData = params.data;
+            this._type = params.type;
+            this._groupings = [ 0, -1 ];
+            this._aggregates = [ 0 ];
+            _.extend(this._options, {
+                isStacked: false,
+                animation: {
+                    duration: 200,
+                    easing: 'inAndOut'
+                }
+            });
+
+            // Toggle stacked-ness on right click
+            var self = this;
+            this.$el.on('mouseup', 'svg', function(e) {
+                if (e.which == 3) {
+                    self._options.isStacked = !self._options.isStacked;
+                    self._updateChart();
+                }
+            });
+        },
+
+        /*****************************************************************/
+        
+        createConfigView: function() {
+            var self = this;
+
+            var configView = new MyCharts.ChartConfigView({
+                reportData: this._reportData,
+                properties: [ 
+                    {
+                        name: 'Primary Grouping',
+                        values: _.map(this._reportData.groupings, function(grouping) {
+                            return grouping.label;
+                        }),
+                        defaultSelectedIndex: self._groupings[0]
+                    },
+                    {
+                        name: 'Secondary Grouping',
+                        values: _.map(this._reportData.groupings, function(grouping) {
+                            return grouping.label;
+                        }),
+                        isOptional: true,
+                        defaultSelectedIndex: self._groupings[1]
+                    },
+                    {
+                        name: 'Value',
+                        values: _.map(this._reportData.aggregates, function(aggregate) {
+                            return ReportData.prettifyAggregateLabel(aggregate.label);
+                        }),
+                        defaultSelectedIndex: self._aggregates[0]
+                    }
+                ]
+            });
+
+            configView.on('propertyChanged', function(propertyIdx, valueIdx) {
+                switch(propertyIdx) {
+                case 0: // grouping 1
+                    self._groupings[0] = valueIdx;
+                    break;
+                case 1: // grouping 2
+                    self._groupings[1] = valueIdx;
+                    break;
+                default: // aggregate
+                    self._aggregates[0] = valueIdx;
+                }
+                self._updateChart();
+            });
+
+            return configView;
+        },
+
+        /*****************************************************************/
+
+        setType: function(chartType) {
+            var self = this;
+            this._type = chartType;
+            if (!this._supportsData()) {
+                this._showUnsupportedMessage();
+                return;
+            }
+            this._createChart(function() {
+                self._updateChart();
+            });
+        },
+
+        /*****************************************************************/
+
+        _hasMultipleGroups: function() {
+            return this._isValidGrouping(this._groupings[1]);
+        },
+
+        _isValidGrouping: function(idx) {
+            return idx >= 0 && idx < this._reportData.groupings.length;
+        },
+
+        /*****************************************************************/
+
+        // Creates the appropriate google chart. Uses animations, so accepts a callback
+        // that will fire when finished.
+        _createChart: function(callback) {
+            var self = this;
+
+            if (this._chart)
+                removeOldChart(createAndShowChart);
+            else
+                createAndShowChart();
+            
+            function removeOldChart(complete) {
+                google.visualization.events.removeAllListeners(self._chart);
+                self.$el.fadeTo(150, 0, complete);
+            }
+
+            function createAndShowChart() {
+                if (self._type == MyCharts.ChartTypes.barVertical)
+                    self._chart = 
+                    new google.visualization.ColumnChart(self.$('.chartyPants')[0]);
+                else if (self._type == MyCharts.ChartTypes.barHorizontal)
+                    self._chart = 
+                    new google.visualization.BarChart(self.$('.chartyPants')[0]);
+                else if (self._type == MyCharts.ChartTypes.line)
+                    self._chart = 
+                    new google.visualization.LineChart(self.$('.chartyPants')[0]);
+                else if (self._type == MyCharts.ChartTypes.area)
+                    self._chart = 
+                    new google.visualization.AreaChart(self.$('.chartyPants')[0]);
+                else if (self._type == MyCharts.ChartTypes.steppedArea)
+                    self._chart = 
+                    new google.visualization.SteppedAreaChart(self.$('.chartyPants')[0]);
+                else
+                    throw "Chart Type (" + self._type +
+                    ") is incompatible with Chart Family (Bar)";
+
+                callback && callback();
+            }
+        },
+
+        /*****************************************************************/
+        
+        _updateChart: function() {
+            var self = this;
+            var chartData = null;
+            if (this._hasMultipleGroups()) {
+                chartData = this._reportData
+                    .getPairwiseGroupingValues(this._groupings[0],
+                                               this._groupings[1],
+                                               [ this._aggregates[0] ],
+                                               ReportDataFormatter.pairwiseFormatter);
+            }
+            else {
+                chartData = this._reportData
+                    .getSingleGroupingValues(this._groupings[0],
+                                             [ this._aggregates[0] ],
+                                             ReportDataFormatter
+                                             .singleGroupingFormatter);
+            }
+
+            _.extend(this._options, {
+                hAxis: { title: 
+                         this._reportData.groupings[this._groupings[0]].label },
+                vAxis: { title: 
+                         ReportData.prettifyAggregateLabel(
+                             this._reportData.aggregates[this._aggregates[0]].label) },
+                bar: { groupWidth: '75%' },
+                chartArea: { top: '5%', left: '15%', bottom: '15%', right:'10%', 
+                             height: '80%', width: '75%' }
+            });
+            
+            this._chart.draw(chartData, this._options);
+            self.$el.fadeTo(150, 1.0);
+        }
+    });
+})();
+</script>
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+</apex:component>

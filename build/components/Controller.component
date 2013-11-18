@@ -1,0 +1,184 @@
+<!-- 
+
+Copyright (c) 2013, salesforce.com, Inc. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification, 
+are permitted provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright notice, 
+    this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright notice, 
+    this list of conditions and the following disclaimer in the documentation 
+    and/or other materials provided with the distribution.
+    * Neither the name of the salesforce.com, Inc. nor the names of its contributors 
+    may be used to endorse or promote products derived from this software 
+    without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. 
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, 
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, 
+BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, 
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE 
+OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED 
+OF THE POSSIBILITY OF SUCH DAMAGE.
+
+-->
+
+<apex:component >
+
+<c:LightBox ></c:LightBox>
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+<script>
+
+;(function() {
+
+    var app = window.MyCharts = window.MyCharts || {};
+    if (app.openShareModal) return;
+
+    /*********************************************************************/
+
+    function LBPostHandler(model, message, isEmbed, closeLightboxCb) {
+        var args = message.split(' ');
+        message = args[0];
+
+        switch (message) {
+        case 'delete':
+            if (isEmbed) {
+                if (MyCharts.isMobile()) {
+                    sforce.one.navigateToURL(app.Api.client.apexPrefix  +
+                                             'MyCharts');
+                }
+                else {
+                    // Note that domain namespaces seem to work on
+                    // desktop, but I think this is safer.
+                    window.location = app.Api.client.apexPrefix +
+                        'MyCharts';
+                }
+                return;
+            }
+
+            model.collection.remove(model);
+            closeLightboxCb();
+            break;
+
+        case 'save':
+            model.id = model.id || args[1];
+            model.fetch({
+                success: function() {
+                    // Not crazy about referencing the collection in
+                    // this way, but it's awkward passing it for now.
+                    if (!isEmbed) {
+                        app.appView._dashboard.add(model, { at: 0 });
+                    }
+                }
+            });
+            break;
+
+        case 'closeShare':
+            if (!isEmbed) {
+                closeLightboxCb();
+            }
+            break;
+
+        case 'close':
+            if (!isEmbed) {
+                closeLightboxCb();
+                // This is gross, but necessary. On chrome/mac, there
+                // is no scroll bar when the lightbox is open, but
+                // there may be one when the lightbox closes. Need to
+                // make sure we do a relayout in that case since the
+                // width of the dashboard changes.
+                setTimeout(function() {
+                    app.appView._dashboardView._relayout();
+                }, 200);
+            }
+            break;
+        }
+    }
+
+    /*********************************************************************/
+
+    app.openShareModal = function(id) {
+        var url = app.Api.client.apexPrefix +
+            'MyChartsShare?chartId=' + id;
+
+        if (MyCharts.isMobile())
+            sforce.one.navigateToURL(url);
+        else
+            app.openLightBox(id, url, false, function(msg, cb) {
+                LBPostHandler(null, msg, false, cb);
+            });
+    };
+
+    /*********************************************************************/
+
+    app.openChartPage = function(chart, options) {
+        // 1. Build the url
+        var url = app.Api.client.apexPrefix + 'ChartPage?hasParent=true';
+        if (!chart) {
+            url += '&notFound=true'
+        }
+        else {
+            if (chart.id)
+                url += '&chartId=' + chart.id;
+            // [ qs name, model name, encode? ]
+            var qsPairs = [ [ 'reportId', 'reportId', false ],
+                            [ 'chartType', 'chartType', false ],
+                            [ 'chartState', 'encodedState', false ],
+                            [ 'reportApiVersion', 'reportApiVersion', false ],
+                            [ 'ownerId', 'ownerId', false ],
+                            [ 'reportApiUrl', 'reportApiUrl', true ],
+                            [ 'title', 'title', true ] ];
+
+            _.each(qsPairs, function(pair) {
+                var val = chart.get(pair[1]);
+                if (val) {
+                    if (pair[2])
+                        val = encodeURIComponent(val);
+                    url += '&' + pair[0] + '=' + val;
+                }
+            });
+
+            if (options && options.editChart)
+                url += '&editChart=true';
+            if (options && options.newChart)
+                url += '&newChart=true'
+        }
+
+        // 2. Navigate to the URL
+        if (MyCharts.isMobile()) {
+            app.startWaiting();
+            if (options && options.noHistory)
+                SfdcApp.projectOneNavigator.fireContainerEvent(
+                    "force:navigateToURL",
+                    { url: url, isredirect: true } );
+            else
+                sforce.one.navigateToURL(url);
+
+            // It appears that SF1 reloads on back.  However,
+            // this timeout is in place in case the model changes
+            // to simply hide iframes in the history stack.
+            setTimeout(app.stopWaiting, 5000);
+        }
+        else {
+            var isEmbed = options && options.embed;
+            app.openLightBox(chart && (chart.id || ''), url,
+                             isEmbed, function(msg, closeLightboxCb) {
+                                 LBPostHandler(chart, msg, isEmbed, closeLightboxCb);
+                             });
+        }
+    };
+
+    /*********************************************************************/
+
+}());
+</script>
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+</apex:component>
