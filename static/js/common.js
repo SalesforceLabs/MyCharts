@@ -58,7 +58,7 @@ OF THE POSSIBILITY OF SUCH DAMAGE.
             version: qs['reportApiVersion'] || 'v29.0'
         };
         var client = new forcetk.Client();
-        if (window.location.host.indexOf('gwf.') == 0)
+        if (window.location.host.indexOf('gwf.') >= 0)
             client.namespace = 'gwf';
         client.reportMetadata = {};
         client.setSessionToken(api.sessionId, api.version);
@@ -73,7 +73,6 @@ OF THE POSSIBILITY OF SUCH DAMAGE.
             client.apexPrefix = '/apex/' + namespace + '__';
         }
         else {
-            client.namespace = null;
             client.apexPrefix = '/apex/';
         }
 
