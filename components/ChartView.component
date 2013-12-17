@@ -180,7 +180,9 @@ images. */
 
         _showUnsupportedMessage: function() {
             this.$el.html('<div class="notSupported">' +
-                          'Report cannot be viewed with this chart type.</div>');
+                          'The report cannot be viewed with this chart type. ' +
+                          'Make sure your report includes the "Record Count" ' +
+                          'field. MyCharts requires it.</div>');
         }
     });
 })();

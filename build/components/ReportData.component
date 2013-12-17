@@ -51,12 +51,24 @@ OF THE POSSIBILITY OF SUCH DAMAGE.
         // Flatten the aggregates into a friendlier format.
         this._extractAggregates = function() {
             var aggregates = this._data.reportMetadata.aggregates;
+            var idx = 0;
             for(i = 0; i < aggregates.length; ++i) {
-                this.indexForAggregate[aggregates[i]] = i;
+                // only support row count, min, max, sum and average
+                var prefix = aggregates[i].split('!')[0];
+                if (prefix != 's' && prefix != 'm' && prefix != 'a'
+                    && prefix != 'mx' && prefix != 'RowCount')
+                    continue;
+
+                this.indexForAggregate[aggregates[i]] = idx;
                 this.aggregates.push({
                     label: aggregates[i],
-                    key: i
+                    key: idx
                 });
+                ++idx;
+            }
+            if (aggregates.indexOf('RowCount') < 0) {
+                this.isBad = true;
+                throw "bad data";
             }
         };
 
@@ -356,10 +368,15 @@ OF THE POSSIBILITY OF SUCH DAMAGE.
         /*********************************************************************/
 
         // Initialization
-        this._extractGroupings();
-        this._extractAggregates();
-        this._extractBuckets();
-        this._buildBetterFactMap();
+        try {
+            this._extractGroupings();
+            this._extractAggregates();
+            this._extractBuckets();
+            this._buildBetterFactMap();
+        }
+        catch(e) {
+            console.log(e);
+        }
     };
 
     /*********************************************************************/

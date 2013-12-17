@@ -33,6 +33,30 @@ OF THE POSSIBILITY OF SUCH DAMAGE.
 
 <script type="x-template" id="ReportPickerViewTemplate">
     <h1>Pick A Report</h1>
+    <div class="reportMissing">
+        <a href="#" class="showReportMissing">Is your report missing from this list?</a>
+    </div>
+    <div class="reportMissingText">
+        <p>
+            MyCharts supports only certain report types - specifically those
+            which are based on only one object type. Reports based on more than
+            one object (e.g. Accounts and Contacts) are not supported.
+        </p>
+        <p>
+            Among supported report types, only matrix and summary format reports
+            are supported.
+        </p>
+        <p>
+            MyCharts requires that you include the "Record Count"
+            field in any report you wish to use with it.
+        </p>
+        <p>
+            Custom formulas are not supported. Reports that contain custom
+            formulas can be used, but the custom formulas will not be
+            available in the chart.
+        </p>
+        <a href="#" class="hideReportMissing">hide</a>
+    </div>
     <ul></ul>
     <img class="reportLoadingIcon"
      src="{!URLFOR($Resource.MyChartsZip, '/images/loading-white.gif')}" />
@@ -47,6 +71,7 @@ OF THE POSSIBILITY OF SUCH DAMAGE.
     overflow-y: scroll;
     min-height: 300px;
     text-align: center;
+    background-color: #f0f1f2;
 }
 .desktop .reportPickerView {
     max-height: 600px;
@@ -64,6 +89,25 @@ OF THE POSSIBILITY OF SUCH DAMAGE.
     font-weight: normal;
     color: #fff;
     padding: 14px;
+}
+
+.reportMissing {
+    margin-top: 10px;
+}
+
+.reportMissingText {
+    display: none;
+    padding-left: 20px;
+    padding-right: 20px;
+    padding-top: 10px;
+}
+
+.reportMissingText p {
+    text-align: left;
+}
+
+.reportMissingText a {
+    text-align: center;
 }
 
 .reportPickerView ul {
@@ -132,7 +176,9 @@ OF THE POSSIBILITY OF SUCH DAMAGE.
             'click ul li': '_click',
             'mousedown ul li': '_mousedown',
             'mousemove ul li': '_mousemove',
-            'mouseup ul li': '_mouseup'
+            'mouseup ul li': '_mouseup',
+            'click .showReportMissing': '_showReportMissingInfo',
+            'click .hideReportMissing': '_hideReportMissingInfo'
         },
 
         /*****************************************************************/
@@ -220,6 +266,16 @@ OF THE POSSIBILITY OF SUCH DAMAGE.
                 this.trigger('reportSelected',
                              this._reports[$(e.currentTarget).index()].Id);
             return false;
+        },
+
+        _showReportMissingInfo: function(e) {
+            this.$('.reportMissing').css('display', 'none');
+            this.$('.reportMissingText').css('display', 'block');
+        },
+
+        _hideReportMissingInfo: function(e) {
+            this.$('.reportMissing').css('display', 'block');
+            this.$('.reportMissingText').css('display', 'none');
         }
 
     });
