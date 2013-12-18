@@ -162,7 +162,8 @@ OF THE POSSIBILITY OF SUCH DAMAGE.
                     { url: window.location.origin + url, 
                       isredirect: true } );
             else
-                sforce.one.navigateToURL(url);
+                // Added window.location.origin to overcome SF1 bug
+                sforce.one.navigateToURL(window.location.origin + url);
 
             // It appears that SF1 reloads on back.  However,
             // this timeout is in place in case the model changes
