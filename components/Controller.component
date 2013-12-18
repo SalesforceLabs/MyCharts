@@ -50,6 +50,7 @@ OF THE POSSIBILITY OF SUCH DAMAGE.
         case 'delete':
             if (isEmbed) {
                 if (MyCharts.isMobile()) {
+                    // This seems to work now despite SF1 navigation bug.
                     sforce.one.navigateToURL(app.Api.client.apexPrefix  +
                                              'MyCharts');
                 }
@@ -107,8 +108,9 @@ OF THE POSSIBILITY OF SUCH DAMAGE.
         var url = app.Api.client.apexPrefix +
             'MyChartsShare?chartId=' + id;
 
-        if (MyCharts.isMobile())
-            sforce.one.navigateToURL(url);
+        if (MyCharts.isMobile()) 
+            // Added window.location.origin to overcome SF1 bug
+            sforce.one.navigateToURL(window.location.origin + url);
         else
             app.openLightBox(id, url, false, function(msg, cb) {
                 LBPostHandler(null, msg, false, cb);
@@ -154,9 +156,11 @@ OF THE POSSIBILITY OF SUCH DAMAGE.
         if (MyCharts.isMobile()) {
             app.startWaiting();
             if (options && options.noHistory)
+                // Added window.location.origin to overcome SF1 bug
                 SfdcApp.projectOneNavigator.fireContainerEvent(
                     "force:navigateToURL",
-                    { url: url, isredirect: true } );
+                    { url: window.location.origin + url, 
+                      isredirect: true } );
             else
                 sforce.one.navigateToURL(url);
 
