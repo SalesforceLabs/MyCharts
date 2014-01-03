@@ -84,39 +84,55 @@ OF THE POSSIBILITY OF SUCH DAMAGE.
     /*************************************************************************/
 
     app.renderToImage = function(src, maxWidth, maxHeight) {
+
         src = src.find('svg:first');
-        var srcWidth = src.width(), srcHeight = src.height();
-        var scale = Math.min(maxWidth / srcWidth, maxHeight / srcHeight);
-        var width = scale * srcWidth, height = scale * srcHeight;
+        var srcWidth = src.width(), 
+            srcHeight = src.height(),
+            scale = Math.min(maxWidth / srcWidth, maxHeight / srcHeight),
+            imgData = null;
+            
+        // Limited to 32KB in custom object field, resize if necessary
+        do {
+            if (imgData !== null) {
+                // Must have been too large, scale down
+                scale = scale * 0.90;
+            }
 
-        var canvas = $('<canvas />')
-                .attr({ width: width, height: height })
-                .css({ position: 'absolute',
-                       top: -srcHeight,
-                       left: -srcWidth,
-                       width: srcWidth,
-                       height: srcHeight
-                     })
-                .appendTo('body');
+            var width = Math.round(scale * srcWidth), 
+                height = Math.round(scale * srcHeight);
 
-        canvg(canvas[0], src.parent().html(),
-              { scaleWidth: srcWidth, scaleHeight: srcHeight });
+            var canvas = $('<canvas />')
+                    .attr({ width: width, height: height })
+                    .css({ position: 'absolute',
+                           top: -srcHeight,
+                           left: -srcWidth,
+                           width: srcWidth,
+                           height: srcHeight
+                         })
+                    .appendTo('body');
 
-        var miniCanvas = $('<canvas />')
-                .attr({ width: width, height: height })
-                .css({ position: 'absolute',
-                       top: -height,
-                       left: -width,
-                       width: width,
-                       height: height
-                     })
-                .appendTo('body');
+            canvg(canvas[0], src.parent().html(),
+                  { scaleWidth: srcWidth, scaleHeight: srcHeight });
 
-        var tCtx = miniCanvas[0].getContext("2d");
-        tCtx.drawImage(canvas[0],0,0,width,height);
-        var imgData = miniCanvas[0].toDataURL("image/png");
-        canvas.remove();
-        miniCanvas.remove();
+            var miniCanvas = $('<canvas />')
+                    .attr({ width: width, height: height })
+                    .css({ position: 'absolute',
+                           top: -height,
+                           left: -width,
+                           width: width,
+                           height: height
+                         })
+                    .appendTo('body');
+
+            var tCtx = miniCanvas[0].getContext("2d");
+            tCtx.drawImage(canvas[0],0,0,width,height);
+            imgData = miniCanvas[0].toDataURL("image/png");
+
+            canvas.remove();
+            miniCanvas.remove();
+
+        } while (imgData.length > 30 * 1024);
+
         return imgData;
     };
 
