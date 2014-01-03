@@ -1,5 +1,14 @@
+TAGS
+\#*
+.\#*
+.DS_Store
+*~
+*.orig
+.emacs*
+.projectile
 *.sublime*
 .DS_Store
 build/
 private/
+fetch/
 
