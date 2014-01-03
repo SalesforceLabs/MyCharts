@@ -1,3 +1,5 @@
 *.sublime*
 .DS_Store
 build/
+private/
+
