@@ -196,49 +196,73 @@ OF THE POSSIBILITY OF SUCH DAMAGE.
 
         onRender: function() {
             var self = this;
-
-            // Query for all reports in the system. Store the results and update the
-            // report dropdown.
             var client = this._params.clientFactory();
-            var queryString = "SELECT Id,Name FROM Report " +
-                "WHERE Format != 'Tabular' AND (Not Name Like '%Sample Report:%') " +
-                "AND (Not Name Like '%Sample Reports:%') "
-            "ORDER BY LastRunDate DESC NULLS LAST";
 
-            // Changing this for org62
+            var myReportQuery = "SELECT Id,Name FROM Report " +
+                "WHERE Format != 'Tabular' " +
+                "AND OwnerId = '{!$User.ID}' " +
+                "ORDER BY LastRunDate DESC NULLS LAST " +
+                "LIMIT 100";
 
-            queryString = "SELECT Id,Name FROM Report " +
-                "WHERE Format != 'Tabular' AND CreatedById = '{!$User.ID}' "
-            "ORDER BY LastRunDate DESC NULLS LAST";
+            var pubReportQuery = "SELECT Id,Name FROM Report " +
+                "WHERE Format != 'Tabular' " +
+                "AND OwnerId = '{!$Organization.Id}' " +
+                "ORDER BY LastRunDate DESC NULLS LAST " +
+                "LIMIT 100";
+            
+            var numResults = 0, numErrors = 0;
 
-            client.query(queryString,
-                         function(response) {
-                             self.$('.reportLoadingIcon').hide();
-                             if (response && response.records &&
-                                 response.records.length > 0) {
-                                 _.each(response.records, function(x) {
-                                     self._reports.push(x);
-                                 });
-                                 var $ul = self.$('ul');
-                                 for (var i = 0; i < self._reports.length; ++i) {
-                                     $ul.append(
-                                         $('<li>').text(self._reports[i].Name));
-                                 }
-                             }
-                             else {
-                                 noReports();
-                             }
-                         },
-                         function(jqXHR, textStatus, errorThrown) {
-                             self.$el.append($('<div>Error loading reports</div>')
-                                             .addClass('reportPickerError'));
-                         }
-                        );
+            function displayResults() {
+                if (numResults == 2 || numResults == 1 && numErrors == 1) {
+                    self.$('.reportLoadingIcon').hide();
+                    if (self._reports.length > 0) {                        
+                        var $ul = self.$('ul');
+                        for (var i = 0; i < self._reports.length; ++i) {
+                            $ul.append(
+                                $('<li>').text(self._reports[i].Name));
+                        }
+                    }
+                    else
+                        noReports();
+                }
+                else if (numErrors == 2) {
+                    self.$('.reportLoadingIcon').hide();
+                    self.$el.append($('<div>Error loading reports</div>')
+                                    .addClass('reportPickerError'));
+                }
+            }
 
             function noReports() {
                 self.$el.append($('<div>No reports available</div>')
                                 .addClass('reportPickerError'));
             }
+
+            function myReportsReturned(resp) {
+                numResults++;
+                if (resp && resp.records && resp.records.length > 0)
+                    _.each(resp.records.reverse(), function(x) {
+                        self._reports.unshift(x);
+                    });
+                displayResults();
+            }
+
+            function pubReportsReturned(resp) {
+                numResults++;
+                if (resp && resp.records && resp.records.length > 0)
+                    _.each(resp.records, function(x) {
+                        self._reports.push(x);
+                    });
+                displayResults();
+            }
+
+            function reportError() {
+                numErrors++;
+                displayResults();
+            }
+                            
+
+            client.query(myReportQuery, myReportsReturned, reportError);
+            client.query(pubReportQuery, pubReportsReturned, reportError);
         },
 
         /*****************************************************************/
