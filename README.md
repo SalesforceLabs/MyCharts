@@ -91,6 +91,11 @@ Navigation. From there, you’ll see an option to add MyCharts to the
 list of mobile navigation menu items. Adding the tab will immediately
 enable it on Salesforce1 for all users.
 
+NOTE: If you don't see the MyCharts icon in stage-left after making the
+above change, go to the users profile in setup and in the "Tab Settings"
+section, make sure the MyCharts tab is set to "Default On" and not 
+"Tab Hidden"
+
 ### Enabling MyCharts as a Salesforce1 MDP action
 
 Installing the MyCharts package creates a Global Action named
@@ -163,4 +168,10 @@ you can specify a feed and also some text to include in the post. A
 MyCharts Chatter post will contain a link to the chart. The owner of a
 chart can edit the chart's properties from this link, and others can
 view the chart.
+
+
+### Changelog
+#### v1.8.1
+* Fixed chart state encoding bug in Salesforce1 - charts would not load
+* Updated stage-left instructions in README
 
