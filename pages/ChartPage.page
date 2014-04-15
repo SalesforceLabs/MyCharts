@@ -144,6 +144,7 @@ $(document).ready(function() {
 
         var chartState = qs.chartState || model && model.get('chartState');
         if (chartState) {
+            chartState = decodeURIComponent(chartState);
             chartState = chartState.replace(/&#34;/g, '"');
             chartState = JSON.parse(chartState);
         }
